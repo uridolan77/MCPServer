@@ -1,0 +1,14 @@
+{
+  "Version": 3,
+  "ListAllProjects": false,
+  "MultiProjectConfigurations": {
+    "API Only": {
+      "Projects": {
+        "MCPServer.API": {}
+      },
+      "SolutionConfiguration": "Debug",
+      "SolutionPlatform": "Any CPU",
+      "SolutionStartupProject": "MCPServer.API"
+    }
+  }
+}
