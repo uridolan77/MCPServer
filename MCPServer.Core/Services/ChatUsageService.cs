@@ -63,7 +63,22 @@ namespace MCPServer.Core.Services
                 {
                     _logger.LogInformation("Using TokenManager for counting tokens");
                     inputTokens = _tokenManager.CountTokens(message);
-                    outputTokens = _tokenManager.CountTokens(response);
+                    
+                    // Check if response has the error marker
+                    if (response.StartsWith("[ERROR_NO_BILLING]"))
+                    {
+                        // Don't count tokens for error messages - they are not billable
+                        outputTokens = 0;
+                        _logger.LogInformation("Detected error message response, not counting output tokens");
+                        
+                        // Remove the error marker from the response for display purposes
+                        response = response.Substring("[ERROR_NO_BILLING]".Length);
+                    }
+                    else
+                    {
+                        // Normal response, count tokens
+                        outputTokens = _tokenManager.CountTokens(response);
+                    }
 
                     // Add history tokens to input if available
                     if (sessionHistory != null)
@@ -79,7 +94,22 @@ namespace MCPServer.Core.Services
                     _logger.LogWarning("TokenManager not available, using fallback token counting");
                     // Fallback estimation: ~4 chars per token as rough estimate
                     inputTokens = message.Length / 4;
-                    outputTokens = response.Length / 4;
+                    
+                    // Check if response has the error marker
+                    if (response.StartsWith("[ERROR_NO_BILLING]"))
+                    {
+                        // Don't count tokens for error messages
+                        outputTokens = 0;
+                        _logger.LogInformation("Detected error message response, not counting output tokens");
+                        
+                        // Remove the error marker from the response for display purposes
+                        response = response.Substring("[ERROR_NO_BILLING]".Length);
+                    }
+                    else
+                    {
+                        // Normal response, count tokens
+                        outputTokens = response.Length / 4;
+                    }
 
                     // Add history tokens to input if available
                     if (sessionHistory != null)
@@ -99,10 +129,20 @@ namespace MCPServer.Core.Services
                         decimal inputCostPer1K = model.CostPer1KInputTokens;
                         decimal outputCostPer1K = model.CostPer1KOutputTokens;
 
-                        estimatedCost = (inputTokens / 1000.0M) * inputCostPer1K +
-                                       (outputTokens / 1000.0M) * outputCostPer1K;
-                        
-                        _logger.LogInformation("Calculated cost: ${EstimatedCost:F6} using model {ModelName}", estimatedCost, model?.Name);
+                        // If the request was not successful, don't charge for any tokens (input or output)
+                        if (!success)
+                        {
+                            _logger.LogInformation("Request was not successful, not charging for tokens");
+                            estimatedCost = 0;
+                        }
+                        else
+                        {
+                            // Only calculate costs for successful requests
+                            estimatedCost = (inputTokens / 1000.0M) * inputCostPer1K +
+                                             (outputTokens / 1000.0M) * outputCostPer1K;
+                            
+                            _logger.LogInformation("Calculated cost: ${EstimatedCost:F6} using model {ModelName}", estimatedCost, model?.Name);
+                        }
                     }
 
                     // Ensure we have the provider information if a model is specified
@@ -241,6 +281,14 @@ namespace MCPServer.Core.Services
                     // Create a completely new DbContext with these options
                     using var freshContext = new McpServerDbContext(options);
                     
+                    // If the request was not successful, ensure no costs are charged
+                    if (!success)
+                    {
+                        outputTokens = 0;
+                        estimatedCost = 0;
+                        _logger.LogInformation("Request was not successful, setting output tokens to 0 and cost to 0 in retry");
+                    }
+                    
                     // Use a simpler approach - create entities directly without loading anything else
                     var usageLog = new ChatUsageLog
                     {
@@ -323,6 +371,14 @@ namespace MCPServer.Core.Services
                 // Create a direct ADO.NET connection with no dependency on EF Core
                 connection = new MySql.Data.MySqlClient.MySqlConnection(_connectionString);
                 await connection.OpenAsync();
+                
+                // If the request was not successful, ensure output tokens are zero
+                if (!success)
+                {
+                    outputTokens = 0;
+                    estimatedCost = 0;
+                    _logger.LogInformation("Request was not successful, setting output tokens and cost to 0 in ADO.NET fallback");
+                }
                 
                 string sql = @"
                     INSERT INTO ChatUsageLogs 

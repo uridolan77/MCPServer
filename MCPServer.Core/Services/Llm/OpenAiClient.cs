@@ -165,8 +165,8 @@ namespace MCPServer.Core.Services.Llm
                         }
                         catch {}
                         
-                        // Send the error message back to the client
-                        await onChunkReceived($"Error connecting to OpenAI: {errorMessage}", true);
+                        // Send the error message back to the client with a special prefix that can be detected by the usage service
+                        await onChunkReceived($"[ERROR_NO_BILLING]Error connecting to OpenAI: {errorMessage}", true);
                         
                         // Also throw the exception so it's properly logged
                         throw new LlmProviderAuthException("OpenAI", errorMessage, responseBody);
@@ -182,7 +182,7 @@ namespace MCPServer.Core.Services.Llm
                 catch (HttpRequestException ex)
                 {
                     _logger.LogError(ex, "HTTP request to OpenAI failed with status code {StatusCode}", ex.StatusCode);
-                    await onChunkReceived("I apologize, but there was an error connecting to the AI service: " + ex.Message, true);
+                    await onChunkReceived("[ERROR_NO_BILLING]I apologize, but there was an error connecting to the AI service: " + ex.Message, true);
                     return;
                 }
 
@@ -247,7 +247,7 @@ namespace MCPServer.Core.Services.Llm
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error streaming response from OpenAI");
-                await onChunkReceived("I apologize, but there was an error processing your request: " + ex.Message, true);
+                await onChunkReceived("[ERROR_NO_BILLING]I apologize, but there was an error processing your request: " + ex.Message, true);
             }
         }
 
