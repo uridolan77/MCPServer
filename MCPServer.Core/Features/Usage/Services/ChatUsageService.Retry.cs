@@ -1,5 +1,7 @@
 using System;
 using System.Threading.Tasks;
+using MCPServer.Core.Data;
+using MCPServer.Core.Models;
 using MCPServer.Core.Models.Llm;
 using Microsoft.EntityFrameworkCore;
 using MySql.EntityFrameworkCore.Extensions;
