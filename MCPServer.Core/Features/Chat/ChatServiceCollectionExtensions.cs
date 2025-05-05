@@ -1,6 +1,6 @@
 using System;
-using MCPServer.Core.Features.Chat.Services;
-using MCPServer.Core.Features.Chat.Services.Interfaces;
+using MCPServer.Core.Services;
+using MCPServer.Core.Services.Interfaces;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace MCPServer.Core.Features.Chat
@@ -23,9 +23,9 @@ namespace MCPServer.Core.Features.Chat
             }
 
             // Register chat services
-            services.AddScoped<IChatStreamingService, Services.ChatStreamingService>();
+            services.AddScoped<IChatStreamingService, MCPServer.Core.Services.ChatStreamingService>();
 #pragma warning disable CS0618 // Type or member is obsolete
-            services.AddScoped<IChatPlaygroundService, Services.ChatPlaygroundService>();
+            services.AddScoped<IChatPlaygroundService, MCPServer.Core.Services.ChatPlaygroundService>();
 #pragma warning restore CS0618 // Type or member is obsolete
 
             return services;

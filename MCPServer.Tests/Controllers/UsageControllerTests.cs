@@ -2,9 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using MCPServer.API.Features.Usage.Controllers;
-using MCPServer.Core.Features.Usage.Services.Interfaces;
 using MCPServer.Core.Models;
 using MCPServer.Core.Models.Responses;
+using MCPServer.Core.Services.Interfaces;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using Moq;
@@ -48,7 +48,7 @@ namespace MCPServer.Tests.Controllers
             var actionResult = Assert.IsType<ActionResult<ApiResponse<ChatUsageStatsResponse>>>(result);
             var okResult = Assert.IsType<OkObjectResult>(actionResult.Result);
             var apiResponse = Assert.IsType<ApiResponse<ChatUsageStatsResponse>>(okResult.Value);
-            
+
             Assert.True(apiResponse.Success);
             Assert.Equal("Usage statistics retrieved successfully", apiResponse.Message);
             Assert.Equal(stats, apiResponse.Data);
@@ -74,7 +74,7 @@ namespace MCPServer.Tests.Controllers
             };
 
             _mockChatUsageService.Setup(x => x.GetFilteredLogsAsync(
-                    It.IsAny<DateTime?>(), It.IsAny<DateTime?>(), It.IsAny<int?>(), 
+                    It.IsAny<DateTime?>(), It.IsAny<DateTime?>(), It.IsAny<int?>(),
                     It.IsAny<int?>(), It.IsAny<string?>(), It.IsAny<int>(), It.IsAny<int>()))
                 .ReturnsAsync(logs);
 
@@ -85,7 +85,7 @@ namespace MCPServer.Tests.Controllers
             var actionResult = Assert.IsType<ActionResult<ApiResponse<List<ChatUsageLogResponse>>>>(result);
             var okResult = Assert.IsType<OkObjectResult>(actionResult.Result);
             var apiResponse = Assert.IsType<ApiResponse<List<ChatUsageLogResponse>>>(okResult.Value);
-            
+
             Assert.True(apiResponse.Success);
             Assert.Equal("Usage logs retrieved successfully", apiResponse.Message);
             Assert.Equal(logs, apiResponse.Data);
@@ -116,7 +116,7 @@ namespace MCPServer.Tests.Controllers
             var actionResult = Assert.IsType<ActionResult<ApiResponse<ModelUsageStatResponse>>>(result);
             var okResult = Assert.IsType<OkObjectResult>(actionResult.Result);
             var apiResponse = Assert.IsType<ApiResponse<ModelUsageStatResponse>>(okResult.Value);
-            
+
             Assert.True(apiResponse.Success);
             Assert.Equal("Model usage statistics retrieved successfully", apiResponse.Message);
             Assert.Equal(stats, apiResponse.Data);
@@ -136,7 +136,7 @@ namespace MCPServer.Tests.Controllers
             var actionResult = Assert.IsType<ActionResult<ApiResponse<ModelUsageStatResponse>>>(result);
             var notFoundResult = Assert.IsType<NotFoundObjectResult>(actionResult.Result);
             var apiResponse = Assert.IsType<ApiResponse<ModelUsageStatResponse>>(notFoundResult.Value);
-            
+
             Assert.False(apiResponse.Success);
             Assert.Equal("No usage statistics found for model with ID 999", apiResponse.Message);
         }
@@ -164,7 +164,7 @@ namespace MCPServer.Tests.Controllers
             var actionResult = Assert.IsType<ActionResult<ApiResponse<ProviderUsageStatResponse>>>(result);
             var okResult = Assert.IsType<OkObjectResult>(actionResult.Result);
             var apiResponse = Assert.IsType<ApiResponse<ProviderUsageStatResponse>>(okResult.Value);
-            
+
             Assert.True(apiResponse.Success);
             Assert.Equal("Provider usage statistics retrieved successfully", apiResponse.Message);
             Assert.Equal(stats, apiResponse.Data);
@@ -184,7 +184,7 @@ namespace MCPServer.Tests.Controllers
             var actionResult = Assert.IsType<ActionResult<ApiResponse<ProviderUsageStatResponse>>>(result);
             var notFoundResult = Assert.IsType<NotFoundObjectResult>(actionResult.Result);
             var apiResponse = Assert.IsType<ApiResponse<ProviderUsageStatResponse>>(notFoundResult.Value);
-            
+
             Assert.False(apiResponse.Success);
             Assert.Equal("No usage statistics found for provider with ID 999", apiResponse.Message);
         }

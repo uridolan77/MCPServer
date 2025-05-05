@@ -10,3 +10,4 @@ namespace MCPServer.Core.Features.Rag.Services.Interfaces
         float CalculateCosineSimilarity(List<float> embedding1, List<float> embedding2);
     }
 }
+

@@ -20,3 +20,4 @@ namespace MCPServer.Core.Features.Auth.Services.Interfaces
         Task AddSessionToUserAsync(string sessionId, string username);
     }
 }
+

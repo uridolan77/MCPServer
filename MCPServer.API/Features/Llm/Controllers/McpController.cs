@@ -39,25 +39,25 @@ namespace MCPServer.API.Features.Llm.Controllers
         /// Sends a message to the LLM service
         /// </summary>
         [HttpPost("message")]
-        public async Task<ActionResult<ApiResponse<McpResponse>>> SendMessage([FromBody] McpRequest request)
+        public async Task<ActionResult<ApiResponse<Models.McpResponse>>> SendMessage([FromBody] Models.McpRequest request)
         {
             try
             {
                 if (string.IsNullOrEmpty(request.SessionId))
                 {
-                    return BadRequestResponse<McpResponse>("SessionId is required");
+                    return BadRequestResponse<Models.McpResponse>("SessionId is required");
                 }
 
                 if (string.IsNullOrEmpty(request.UserInput))
                 {
-                    return BadRequestResponse<McpResponse>("UserInput is required");
+                    return BadRequestResponse<Models.McpResponse>("UserInput is required");
                 }
 
                 // Get the current user
                 var username = User.Identity?.Name;
                 if (string.IsNullOrEmpty(username))
                 {
-                    return StatusCode(401, ApiResponse<McpResponse>.ErrorResponse("User not authenticated"));
+                    return StatusCode(401, ApiResponse<Models.McpResponse>.ErrorResponse("User not authenticated"));
                 }
 
                 // Check if the session belongs to the user
@@ -94,7 +94,7 @@ namespace MCPServer.API.Features.Llm.Controllers
                 await _contextService.UpdateContextAsync(request.SessionId, request.UserInput, response);
 
                 // Return response
-                var mcpResponse = new McpResponse
+                var mcpResponse = new Models.McpResponse
                 {
                     SessionId = request.SessionId,
                     Output = response,
@@ -106,7 +106,7 @@ namespace MCPServer.API.Features.Llm.Controllers
             }
             catch (Exception ex)
             {
-                return ErrorResponse<McpResponse>("Error processing message request", ex);
+                return ErrorResponse<Models.McpResponse>("Error processing message request", ex);
             }
         }
 

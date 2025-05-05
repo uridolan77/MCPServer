@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using MCPServer.API.Features.Auth.Models;
 using MCPServer.Core.Models;
 using MCPServer.Core.Models.Llm;
 using MCPServer.Core.Services.Interfaces;

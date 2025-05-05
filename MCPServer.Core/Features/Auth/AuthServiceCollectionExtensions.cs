@@ -1,6 +1,6 @@
 using System;
-using MCPServer.Core.Features.Auth.Services;
-using MCPServer.Core.Features.Auth.Services.Interfaces;
+using MCPServer.Core.Services;
+using MCPServer.Core.Services.Interfaces;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace MCPServer.Core.Features.Auth

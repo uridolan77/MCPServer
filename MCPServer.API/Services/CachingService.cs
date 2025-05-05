@@ -2,7 +2,7 @@ using System;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
-using MCPServer.Core.Services.Interfaces;
+using MCPServer.Core.Features.Shared.Services.Interfaces;
 
 namespace MCPServer.API.Services
 {

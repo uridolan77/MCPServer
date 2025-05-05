@@ -1,5 +1,5 @@
 using System;
-using MCPServer.API.Controllers;
+using MCPServer.API.Features.Health.Controllers;
 using MCPServer.Core.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
@@ -28,10 +28,10 @@ namespace MCPServer.Tests.Controllers
             // Assert
             var okResult = Assert.IsType<OkObjectResult>(result.Result);
             var response = Assert.IsType<ApiResponse<object>>(okResult.Value);
-            
+
             Assert.True(response.Success);
             Assert.Equal("API is running", response.Message);
-            
+
             var data = Assert.IsType<dynamic>(response.Data);
             Assert.Equal("healthy", data.status);
         }

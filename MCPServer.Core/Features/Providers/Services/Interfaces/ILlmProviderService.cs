@@ -41,3 +41,4 @@ namespace MCPServer.Core.Features.Providers.Services.Interfaces
         Task<decimal> GetTotalCostByUserIdAsync(Guid? userId, DateTime? startDate = null, DateTime? endDate = null);
     }
 }
+

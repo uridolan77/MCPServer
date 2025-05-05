@@ -1,6 +1,6 @@
 using System;
 using System.Threading.Tasks;
-using MCPServer.API.Controllers;
+using MCPServer.API.Features.Auth.Controllers;
 using MCPServer.Core.Models;
 using MCPServer.Core.Models.Auth;
 using MCPServer.Core.Services.Interfaces;
@@ -51,7 +51,7 @@ namespace MCPServer.Tests.Controllers
             // Assert
             var okResult = Assert.IsType<OkObjectResult>(result.Result);
             var apiResponse = Assert.IsType<ApiResponse<AuthResponse>>(okResult.Value);
-            
+
             Assert.True(apiResponse.Success);
             Assert.Equal("User registered successfully", apiResponse.Message);
             Assert.Equal(response, apiResponse.Data);
@@ -77,7 +77,7 @@ namespace MCPServer.Tests.Controllers
             // Assert
             var badRequestResult = Assert.IsType<BadRequestObjectResult>(result.Result);
             var apiResponse = Assert.IsType<ApiResponse<AuthResponse>>(badRequestResult.Value);
-            
+
             Assert.False(apiResponse.Success);
             Assert.Equal("Username or email already exists", apiResponse.Message);
             Assert.Null(apiResponse.Data);
@@ -109,7 +109,7 @@ namespace MCPServer.Tests.Controllers
             // Assert
             var okResult = Assert.IsType<OkObjectResult>(result.Result);
             var apiResponse = Assert.IsType<ApiResponse<AuthResponse>>(okResult.Value);
-            
+
             Assert.True(apiResponse.Success);
             Assert.Equal("Login successful", apiResponse.Message);
             Assert.Equal(response, apiResponse.Data);
@@ -134,7 +134,7 @@ namespace MCPServer.Tests.Controllers
             // Assert
             var unauthorizedResult = Assert.IsType<ObjectResult>(result.Result);
             Assert.Equal(401, unauthorizedResult.StatusCode);
-            
+
             var apiResponse = Assert.IsType<ApiResponse<AuthResponse>>(unauthorizedResult.Value);
             Assert.False(apiResponse.Success);
             Assert.Equal("Invalid username or password", apiResponse.Message);
@@ -166,7 +166,7 @@ namespace MCPServer.Tests.Controllers
             // Assert
             var okResult = Assert.IsType<OkObjectResult>(result.Result);
             var apiResponse = Assert.IsType<ApiResponse<AuthResponse>>(okResult.Value);
-            
+
             Assert.True(apiResponse.Success);
             Assert.Equal("Token refreshed successfully", apiResponse.Message);
             Assert.Equal(response, apiResponse.Data);
@@ -190,7 +190,7 @@ namespace MCPServer.Tests.Controllers
             // Assert
             var unauthorizedResult = Assert.IsType<ObjectResult>(result.Result);
             Assert.Equal(401, unauthorizedResult.StatusCode);
-            
+
             var apiResponse = Assert.IsType<ApiResponse<AuthResponse>>(unauthorizedResult.Value);
             Assert.False(apiResponse.Success);
             Assert.Equal("Invalid refresh token", apiResponse.Message);
@@ -215,7 +215,7 @@ namespace MCPServer.Tests.Controllers
             // Assert
             var okResult = Assert.IsType<OkObjectResult>(result.Result);
             var apiResponse = Assert.IsType<ApiResponse<bool>>(okResult.Value);
-            
+
             Assert.True(apiResponse.Success);
             Assert.Equal("Token revoked successfully", apiResponse.Message);
             Assert.True(apiResponse.Data);
@@ -239,7 +239,7 @@ namespace MCPServer.Tests.Controllers
             // Assert
             var notFoundResult = Assert.IsType<NotFoundObjectResult>(result.Result);
             var apiResponse = Assert.IsType<ApiResponse<bool>>(notFoundResult.Value);
-            
+
             Assert.False(apiResponse.Success);
             Assert.Equal("Token not found", apiResponse.Message);
             Assert.Null(apiResponse.Data);

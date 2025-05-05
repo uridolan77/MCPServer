@@ -8,6 +8,8 @@ using MCPServer.Core.Models.Llm;
 using MCPServer.Core.Services.Interfaces;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using IUnitOfWork = MCPServer.Core.Features.Shared.Services.Interfaces.IUnitOfWork;
+using ICachingService = MCPServer.Core.Features.Shared.Services.Interfaces.ICachingService;
 
 namespace MCPServer.Core.Services
 {

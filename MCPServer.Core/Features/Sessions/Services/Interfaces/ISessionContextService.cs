@@ -25,3 +25,4 @@ namespace MCPServer.Core.Features.Sessions.Services.Interfaces
         Task AddAssistantMessageAsync(string sessionId, string message);
     }
 }
+

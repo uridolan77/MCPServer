@@ -9,10 +9,10 @@ using System.Threading.Tasks;
 using MCPServer.Core.Config;
 using MCPServer.Core.Data;
 using MCPServer.Core.Models.Auth;
-using MCPServer.Core.Features.Auth.Services.Interfaces;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
+using MCPServer.Core.Features.Auth.Services.Interfaces;
 
 namespace MCPServer.Core.Features.Auth.Services
 {
@@ -293,3 +293,7 @@ namespace MCPServer.Core.Features.Auth.Services
         }
     }
 }
+
+
+
+

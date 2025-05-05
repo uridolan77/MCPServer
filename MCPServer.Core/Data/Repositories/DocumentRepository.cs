@@ -3,8 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using MCPServer.Core.Models.Rag;
-using MCPServer.Core.Services;
-using MCPServer.Core.Services.Interfaces;
+using MCPServer.Core.Features.Shared.Services;
+using MCPServer.Core.Features.Shared.Services.Interfaces;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
@@ -106,3 +106,4 @@ namespace MCPServer.Core.Data.Repositories
         }
     }
 }
+

@@ -17,3 +17,4 @@ namespace MCPServer.Core.Features.Rag.Services.Interfaces
         Task<List<ChunkSearchResult>> SearchByEmbeddingAsync(List<float> embedding, int topK = 3, float minScore = 0.7f, Dictionary<string, string>? metadata = null);
     }
 }
+

@@ -3,33 +3,30 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using MCPServer.Core.Data;
-using MCPServer.Core.Data.Repositories;
 using MCPServer.Core.Models.Rag;
-using MCPServer.Core.Services.Interfaces;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using MCPServer.Core.Features.Rag.Services.Interfaces;
 
-namespace MCPServer.Core.Services.Rag
+namespace MCPServer.Core.Features.Rag.Services.Rag
 {
-    public class VectorDbService : IVectorDbService
+    public class MySqlVectorDbService : IVectorDbService
     {
-        private readonly IUnitOfWork _unitOfWork;
-        private readonly IChunkRepository _chunkRepository;
-        private readonly IDocumentRepository _documentRepository;
-        private readonly ILogger<VectorDbService> _logger;
+        private readonly McpServerDbContext _dbContext;
+        private readonly ILogger<MySqlVectorDbService> _logger;
         private readonly IEmbeddingService _embeddingService;
+        private readonly IDocumentService _documentService;
 
-        public VectorDbService(
-            IUnitOfWork unitOfWork,
-            IChunkRepository chunkRepository,
-            IDocumentRepository documentRepository,
+        public MySqlVectorDbService(
+            McpServerDbContext dbContext,
+            ILogger<MySqlVectorDbService> logger,
             IEmbeddingService embeddingService,
-            ILogger<VectorDbService> logger)
+            IDocumentService documentService)
         {
-            _unitOfWork = unitOfWork ?? throw new ArgumentNullException(nameof(unitOfWork));
-            _chunkRepository = chunkRepository ?? throw new ArgumentNullException(nameof(chunkRepository));
-            _documentRepository = documentRepository ?? throw new ArgumentNullException(nameof(documentRepository));
-            _embeddingService = embeddingService ?? throw new ArgumentNullException(nameof(embeddingService));
-            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _dbContext = dbContext;
+            _logger = logger;
+            _embeddingService = embeddingService;
+            _documentService = documentService;
         }
 
         public async Task<bool> AddChunkAsync(Chunk chunk)
@@ -42,8 +39,8 @@ namespace MCPServer.Core.Services.Rag
                     chunk.Embedding = await _embeddingService.GetEmbeddingAsync(chunk.Content);
                 }
 
-                await _chunkRepository.AddAsync(chunk);
-                await _unitOfWork.SaveChangesAsync();
+                _dbContext.Chunks.Add(chunk);
+                await _dbContext.SaveChangesAsync();
 
                 _logger.LogInformation("Added chunk with ID: {ChunkId}", chunk.Id);
                 return true;
@@ -59,8 +56,6 @@ namespace MCPServer.Core.Services.Rag
         {
             try
             {
-                await _unitOfWork.BeginTransactionAsync();
-
                 // Generate embeddings for chunks without embeddings
                 var chunksToEmbed = chunks
                     .Where(c => c.Embedding == null || c.Embedding.Count == 0)
@@ -81,19 +76,14 @@ namespace MCPServer.Core.Services.Rag
                 }
 
                 // Add all chunks to the database
-                foreach (var chunk in chunks)
-                {
-                    await _chunkRepository.AddAsync(chunk);
-                }
-                
-                await _unitOfWork.CommitTransactionAsync();
+                await _dbContext.Chunks.AddRangeAsync(chunks);
+                await _dbContext.SaveChangesAsync();
 
                 _logger.LogInformation("Added {ChunkCount} chunks", chunks.Count);
                 return true;
             }
             catch (Exception ex)
             {
-                await _unitOfWork.RollbackTransactionAsync();
                 _logger.LogError(ex, "Error adding chunks");
                 return false;
             }
@@ -101,20 +91,22 @@ namespace MCPServer.Core.Services.Rag
 
         public async Task<Chunk?> GetChunkAsync(string id)
         {
-            return await _chunkRepository.GetByIdAsync(id);
+            return await _dbContext.Chunks.FindAsync(id);
         }
 
         public async Task<List<Chunk>> GetChunksByDocumentIdAsync(string documentId)
         {
-            var chunks = await _chunkRepository.GetChunksByDocumentIdAsync(documentId);
-            return chunks.ToList();
+            return await _dbContext.Chunks
+                .Where(c => c.DocumentId == documentId)
+                .OrderBy(c => c.ChunkIndex)
+                .ToListAsync();
         }
 
         public async Task<bool> UpdateChunkAsync(Chunk chunk)
         {
             try
             {
-                var existingChunk = await _chunkRepository.GetByIdAsync(chunk.Id);
+                var existingChunk = await _dbContext.Chunks.FindAsync(chunk.Id);
 
                 if (existingChunk == null)
                 {
@@ -122,14 +114,8 @@ namespace MCPServer.Core.Services.Rag
                     return false;
                 }
 
-                // Generate embedding if content has changed
-                if (existingChunk.Content != chunk.Content || chunk.Embedding == null || chunk.Embedding.Count == 0)
-                {
-                    chunk.Embedding = await _embeddingService.GetEmbeddingAsync(chunk.Content);
-                }
-
-                await _chunkRepository.UpdateAsync(chunk);
-                await _unitOfWork.SaveChangesAsync();
+                _dbContext.Entry(existingChunk).CurrentValues.SetValues(chunk);
+                await _dbContext.SaveChangesAsync();
 
                 _logger.LogInformation("Updated chunk with ID: {ChunkId}", chunk.Id);
                 return true;
@@ -145,7 +131,7 @@ namespace MCPServer.Core.Services.Rag
         {
             try
             {
-                var chunk = await _chunkRepository.GetByIdAsync(id);
+                var chunk = await _dbContext.Chunks.FindAsync(id);
 
                 if (chunk == null)
                 {
@@ -153,8 +139,8 @@ namespace MCPServer.Core.Services.Rag
                     return false;
                 }
 
-                await _chunkRepository.DeleteAsync(id);
-                await _unitOfWork.SaveChangesAsync();
+                _dbContext.Chunks.Remove(chunk);
+                await _dbContext.SaveChangesAsync();
 
                 _logger.LogInformation("Deleted chunk with ID: {ChunkId}", id);
                 return true;
@@ -168,7 +154,23 @@ namespace MCPServer.Core.Services.Rag
 
         public async Task<bool> DeleteChunksByDocumentIdAsync(string documentId)
         {
-            return await _chunkRepository.DeleteChunksByDocumentIdAsync(documentId);
+            try
+            {
+                var chunks = await _dbContext.Chunks
+                    .Where(c => c.DocumentId == documentId)
+                    .ToListAsync();
+
+                _dbContext.Chunks.RemoveRange(chunks);
+                await _dbContext.SaveChangesAsync();
+
+                _logger.LogInformation("Deleted {ChunkCount} chunks for document ID: {DocumentId}", chunks.Count, documentId);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error deleting chunks for document ID: {DocumentId}", documentId);
+                return false;
+            }
         }
 
         public async Task<List<ChunkSearchResult>> SearchAsync(string query, int topK = 3, float minScore = 0.7f, Dictionary<string, string>? metadata = null)
@@ -193,15 +195,19 @@ namespace MCPServer.Core.Services.Rag
             {
                 var results = new List<ChunkSearchResult>();
 
-                // Get chunks filtered by metadata if provided
-                IEnumerable<Chunk> chunks;
+                // Get all chunks from the database
+                // Note: In a production environment, you would want to implement a more efficient search
+                // using a vector database or specialized indexing
+                var chunks = await _dbContext.Chunks.ToListAsync();
+
+                // Filter chunks by metadata if provided
                 if (metadata != null && metadata.Count > 0)
                 {
-                    chunks = await _chunkRepository.GetChunksByMetadataAsync(metadata);
-                }
-                else
-                {
-                    chunks = await _chunkRepository.GetAllAsync();
+                    // Since metadata is stored as JSON, we need to filter in memory
+                    chunks = chunks.Where(c =>
+                        metadata.All(m =>
+                            c.Metadata.ContainsKey(m.Key) &&
+                            c.Metadata[m.Key] == m.Value)).ToList();
                 }
 
                 // Calculate similarity scores
@@ -213,7 +219,7 @@ namespace MCPServer.Core.Services.Rag
 
                         if (score >= minScore)
                         {
-                            var document = await _documentRepository.GetByIdAsync(chunk.DocumentId);
+                            var document = await _documentService.GetDocumentAsync(chunk.DocumentId);
 
                             results.Add(new ChunkSearchResult
                             {
@@ -239,3 +245,7 @@ namespace MCPServer.Core.Services.Rag
         }
     }
 }
+
+
+
+

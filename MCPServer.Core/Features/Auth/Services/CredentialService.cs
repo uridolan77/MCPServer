@@ -4,10 +4,11 @@ using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
 using MCPServer.Core.Models.Llm;
-using MCPServer.Core.Features.Auth.Services.Interfaces;
-using MCPServer.Core.Features.Shared.Services.Interfaces;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using IUnitOfWork = MCPServer.Core.Features.Shared.Services.Interfaces.IUnitOfWork;
+using ISecurityService = MCPServer.Core.Features.Shared.Services.Interfaces.ISecurityService;
+using MCPServer.Core.Features.Auth.Services.Interfaces;
 
 namespace MCPServer.Core.Features.Auth.Services
 {
@@ -36,19 +37,19 @@ namespace MCPServer.Core.Features.Auth.Services
             try
             {
                 var repository = _unitOfWork.GetRepository<LlmProviderCredential>();
-                
+
                 var credentials = await repository.Query()
                     .Include(c => c.Provider)
                     .Where(c => c.ProviderId == providerId)
                     .ToListAsync();
-                
+
                 // Redact sensitive information
                 foreach (var credential in credentials)
                 {
                     credential.EncryptedCredentials = "[REDACTED]";
                     credential.ApiKey = "[REDACTED]";
                 }
-                
+
                 return credentials;
             }
             catch (Exception ex)
@@ -64,19 +65,19 @@ namespace MCPServer.Core.Features.Auth.Services
             try
             {
                 var repository = _unitOfWork.GetRepository<LlmProviderCredential>();
-                
+
                 var credentials = await repository.Query()
                     .Include(c => c.Provider)
                     .Where(c => c.UserId == userId || c.UserId == null)
                     .ToListAsync();
-                
+
                 // Redact sensitive information
                 foreach (var credential in credentials)
                 {
                     credential.EncryptedCredentials = "[REDACTED]";
                     credential.ApiKey = "[REDACTED]";
                 }
-                
+
                 return credentials;
             }
             catch (Exception ex)
@@ -92,18 +93,18 @@ namespace MCPServer.Core.Features.Auth.Services
             try
             {
                 var repository = _unitOfWork.GetRepository<LlmProviderCredential>();
-                
+
                 var credential = await repository.Query()
                     .Include(c => c.Provider)
                     .FirstOrDefaultAsync(c => c.Id == id);
-                
+
                 if (credential != null)
                 {
                     // Redact sensitive information
                     credential.EncryptedCredentials = "[REDACTED]";
                     credential.ApiKey = "[REDACTED]";
                 }
-                
+
                 return credential;
             }
             catch (Exception ex)
@@ -119,7 +120,7 @@ namespace MCPServer.Core.Features.Auth.Services
             try
             {
                 var repository = _unitOfWork.GetRepository<LlmProviderCredential>();
-                
+
                 // First try to get user-specific default credential
                 if (userId.HasValue)
                 {
@@ -129,7 +130,7 @@ namespace MCPServer.Core.Features.Auth.Services
                                                 c.UserId == userId &&
                                                 c.IsDefault &&
                                                 c.IsEnabled);
-                    
+
                     if (userCredential != null)
                     {
                         // Redact sensitive information
@@ -138,7 +139,7 @@ namespace MCPServer.Core.Features.Auth.Services
                         return userCredential;
                     }
                 }
-                
+
                 // Fall back to system-wide default credential
                 var systemCredential = await repository.Query()
                     .Include(c => c.Provider)
@@ -146,14 +147,14 @@ namespace MCPServer.Core.Features.Auth.Services
                                             c.UserId == null &&
                                             c.IsDefault &&
                                             c.IsEnabled);
-                
+
                 if (systemCredential != null)
                 {
                     // Redact sensitive information
                     systemCredential.EncryptedCredentials = "[REDACTED]";
                     systemCredential.ApiKey = "[REDACTED]";
                 }
-                
+
                 return systemCredential;
             }
             catch (Exception ex)
@@ -169,33 +170,33 @@ namespace MCPServer.Core.Features.Auth.Services
             try
             {
                 var repository = _unitOfWork.GetRepository<LlmProviderCredential>();
-                
+
                 // Check if this is the first credential for this provider/user
                 var existingCredentials = await repository.Query()
                     .Where(c => c.ProviderId == credential.ProviderId &&
                               (c.UserId == credential.UserId || (c.UserId == null && credential.UserId == null)))
                     .ToListAsync();
-                
+
                 if (existingCredentials.Count == 0)
                 {
                     credential.IsDefault = true;
                 }
-                
+
                 // Encrypt the credentials
                 var json = JsonSerializer.Serialize(rawCredentials);
                 credential.EncryptedCredentials = await _securityService.EncryptAsync(json);
-                
+
                 // Set creation timestamp
                 credential.CreatedAt = DateTime.UtcNow;
                 credential.UpdatedAt = DateTime.UtcNow;
-                
+
                 // Add the credential
                 await repository.AddAsync(credential);
                 await _unitOfWork.SaveChangesAsync();
-                
+
                 _logger.LogInformation("Added credential: {CredentialName} (ID: {CredentialId}) for provider {ProviderId}",
                     credential.Name, credential.Id, credential.ProviderId);
-                
+
                 // Redact sensitive information before returning
                 var result = await GetCredentialByIdAsync(credential.Id);
                 return result ?? credential;
@@ -213,34 +214,34 @@ namespace MCPServer.Core.Features.Auth.Services
             try
             {
                 var repository = _unitOfWork.GetRepository<LlmProviderCredential>();
-                
+
                 var existingCredential = await repository.GetByIdAsync(credential.Id);
-                
+
                 if (existingCredential == null)
                 {
                     _logger.LogWarning("Cannot update credential. Credential not found with ID: {CredentialId}", credential.Id);
                     return false;
                 }
-                
+
                 // Update the credential properties
                 existingCredential.Name = credential.Name;
                 existingCredential.ProviderId = credential.ProviderId;
                 existingCredential.IsEnabled = credential.IsEnabled;
                 existingCredential.UpdatedAt = DateTime.UtcNow;
-                
+
                 // Update the encrypted credentials if provided
                 if (rawCredentials != null)
                 {
                     var json = JsonSerializer.Serialize(rawCredentials);
                     existingCredential.EncryptedCredentials = await _securityService.EncryptAsync(json);
                 }
-                
+
                 await repository.UpdateAsync(existingCredential);
                 await _unitOfWork.SaveChangesAsync();
-                
+
                 _logger.LogInformation("Updated credential: {CredentialName} (ID: {CredentialId})",
                     credential.Name, credential.Id);
-                
+
                 return true;
             }
             catch (Exception ex)
@@ -256,20 +257,20 @@ namespace MCPServer.Core.Features.Auth.Services
             try
             {
                 var repository = _unitOfWork.GetRepository<LlmProviderCredential>();
-                
+
                 var credential = await repository.GetByIdAsync(id);
-                
+
                 if (credential == null)
                 {
                     _logger.LogWarning("Cannot delete credential. Credential not found with ID: {CredentialId}", id);
                     return false;
                 }
-                
+
                 await repository.DeleteAsync(id);
                 await _unitOfWork.SaveChangesAsync();
-                
+
                 _logger.LogInformation("Deleted credential with ID: {CredentialId}", id);
-                
+
                 return true;
             }
             catch (Exception ex)
@@ -285,18 +286,18 @@ namespace MCPServer.Core.Features.Auth.Services
             try
             {
                 var repository = _unitOfWork.GetRepository<LlmProviderCredential>();
-                
+
                 var credential = await repository.GetByIdAsync(credentialId);
-                
+
                 if (credential == null)
                 {
                     _logger.LogWarning("Cannot set default credential. Credential not found with ID: {CredentialId}", credentialId);
                     return false;
                 }
-                
+
                 // Begin transaction
                 await _unitOfWork.BeginTransactionAsync();
-                
+
                 try
                 {
                     // Clear default flag for all credentials for this provider and user
@@ -304,23 +305,23 @@ namespace MCPServer.Core.Features.Auth.Services
                         .Where(c => c.ProviderId == credential.ProviderId &&
                                   (c.UserId == credential.UserId || (c.UserId == null && credential.UserId == null)))
                         .ToListAsync();
-                    
+
                     foreach (var existingCredential in existingCredentials)
                     {
                         existingCredential.IsDefault = false;
                         await repository.UpdateAsync(existingCredential);
                     }
-                    
+
                     // Set this credential as default
                     credential.IsDefault = true;
                     await repository.UpdateAsync(credential);
-                    
+
                     // Commit transaction
                     await _unitOfWork.CommitTransactionAsync();
-                    
+
                     _logger.LogInformation("Set credential {CredentialName} (ID: {CredentialId}) as default for provider {ProviderId}",
                         credential.Name, credential.Id, credential.ProviderId);
-                    
+
                     return true;
                 }
                 catch (Exception ex)
@@ -344,22 +345,22 @@ namespace MCPServer.Core.Features.Auth.Services
             try
             {
                 var repository = _unitOfWork.GetRepository<LlmProviderCredential>();
-                
+
                 var credential = await repository.GetByIdAsync(credentialId);
-                
+
                 if (credential == null || string.IsNullOrEmpty(credential.EncryptedCredentials))
                 {
                     return null;
                 }
-                
+
                 // Decrypt the credentials
                 var json = await _securityService.DecryptAsync(credential.EncryptedCredentials);
-                
+
                 // Update last used timestamp
                 credential.LastUsedAt = DateTime.UtcNow;
                 await repository.UpdateAsync(credential);
                 await _unitOfWork.SaveChangesAsync();
-                
+
                 return JsonSerializer.Deserialize<T>(json);
             }
             catch (Exception ex)
@@ -375,20 +376,20 @@ namespace MCPServer.Core.Features.Auth.Services
             try
             {
                 var repository = _unitOfWork.GetRepository<LlmProviderCredential>();
-                
+
                 var credential = await repository.GetByIdAsync(credentialId);
-                
+
                 if (credential == null)
                 {
                     return false;
                 }
-                
+
                 // If admin is required, the caller should check the user's roles
                 if (requireAdmin)
                 {
                     return true; // The caller will check admin role
                 }
-                
+
                 // Check if the credential belongs to the user or is a system credential
                 return credential.UserId == null || credential.UserId == userId;
             }
@@ -400,3 +401,7 @@ namespace MCPServer.Core.Features.Auth.Services
         }
     }
 }
+
+
+
+

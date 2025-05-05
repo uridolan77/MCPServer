@@ -1,13 +1,14 @@
 using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
+using MCPServer.Core.Config;
 using MCPServer.Core.Data;
-using MCPServer.Core.Features.Sessions.Services.Interfaces;
 using MCPServer.Core.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using MCPServer.Core.Features.Auth.Services.Interfaces;
+using MCPServer.Core.Features.Sessions.Services.Interfaces;
 
 namespace MCPServer.Core.Features.Sessions.Services
 {
@@ -15,162 +16,154 @@ namespace MCPServer.Core.Features.Sessions.Services
     {
         private readonly McpServerDbContext _dbContext;
         private readonly ILogger<MySqlContextService> _logger;
+        private readonly AppSettings _appSettings;
+        private readonly ITokenManager _tokenManager;
 
         public MySqlContextService(
             McpServerDbContext dbContext,
-            ILogger<MySqlContextService> logger)
+            IOptions<AppSettings> appSettings,
+            ILogger<MySqlContextService> logger,
+            ITokenManager tokenManager)
         {
             _dbContext = dbContext;
             _logger = logger;
+            _appSettings = appSettings.Value;
+            _tokenManager = tokenManager;
         }
 
-        public async Task<SessionContext?> GetContextAsync(string sessionId)
+        public async Task<SessionContext> GetSessionContextAsync(string sessionId)
         {
             try
             {
-                // Find the session in the database
-                var session = await _dbContext.Sessions
-                    .FirstOrDefaultAsync(s => s.SessionId == sessionId);
+                var sessionData = await _dbContext.Sessions.FirstOrDefaultAsync(s => s.SessionId == sessionId);
 
-                if (session == null)
+                if (sessionData == null)
                 {
-                    _logger.LogInformation("Session {SessionId} not found", sessionId);
-                    return null;
+                    _logger.LogInformation("Creating new session context for {SessionId}", sessionId);
+                    return new SessionContext { SessionId = sessionId };
                 }
 
-                // Deserialize the context
-                var context = new SessionContext
-                {
-                    SessionId = session.SessionId,
-                    Title = session.Title,
-                    Username = session.Username,
-                    CreatedAt = session.CreatedAt,
-                    UpdatedAt = session.UpdatedAt
-                };
+                var context = JsonSerializer.Deserialize<SessionContext>(sessionData.Data);
 
-                // Deserialize messages if available
-                if (!string.IsNullOrEmpty(session.MessagesJson))
+                if (context == null)
                 {
-                    try
-                    {
-                        context.Messages = JsonSerializer.Deserialize<List<Message>>(session.MessagesJson) ?? new List<Message>();
-                    }
-                    catch (JsonException ex)
-                    {
-                        _logger.LogError(ex, "Error deserializing messages for session {SessionId}", sessionId);
-                        context.Messages = new List<Message>();
-                    }
+                    _logger.LogWarning("Failed to deserialize context for {SessionId}, creating new", sessionId);
+                    return new SessionContext { SessionId = sessionId };
                 }
-                else
-                {
-                    context.Messages = new List<Message>();
-                }
+
+                // Update expiry
+                sessionData.LastUpdatedAt = DateTime.UtcNow;
+                sessionData.ExpiresAt = DateTime.UtcNow.AddMinutes(_appSettings.Redis.SessionExpiryMinutes);
+                await _dbContext.SaveChangesAsync();
 
                 return context;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error getting context for session {SessionId}", sessionId);
-                throw;
+                _logger.LogError(ex, "Error retrieving session context for {SessionId}", sessionId);
+                return new SessionContext { SessionId = sessionId };
             }
         }
 
-        public async Task<bool> SaveContextAsync(SessionContext context)
+        public async Task SaveContextAsync(SessionContext context)
         {
             try
             {
-                // Find the session in the database
-                var session = await _dbContext.Sessions
-                    .FirstOrDefaultAsync(s => s.SessionId == context.SessionId);
+                var sessionData = await _dbContext.Sessions.FirstOrDefaultAsync(s => s.SessionId == context.SessionId);
 
-                if (session == null)
+                string json = JsonSerializer.Serialize(context);
+
+                if (sessionData == null)
                 {
-                    // Create a new session
-                    session = new Session
+                    // Create new session
+                    sessionData = new SessionData
                     {
                         SessionId = context.SessionId,
-                        Title = context.Title,
-                        Username = context.Username,
-                        CreatedAt = context.CreatedAt,
-                        UpdatedAt = DateTime.UtcNow
+                        Data = json,
+                        CreatedAt = DateTime.UtcNow,
+                        LastUpdatedAt = DateTime.UtcNow,
+                        ExpiresAt = DateTime.UtcNow.AddMinutes(_appSettings.Redis.SessionExpiryMinutes)
                     };
 
-                    _dbContext.Sessions.Add(session);
+                    _dbContext.Sessions.Add(sessionData);
                 }
                 else
                 {
-                    // Update the existing session
-                    session.Title = context.Title;
-                    session.Username = context.Username;
-                    session.UpdatedAt = DateTime.UtcNow;
+                    // Update existing session
+                    sessionData.Data = json;
+                    sessionData.LastUpdatedAt = DateTime.UtcNow;
+                    sessionData.ExpiresAt = DateTime.UtcNow.AddMinutes(_appSettings.Redis.SessionExpiryMinutes);
+
+                    _dbContext.Sessions.Update(sessionData);
                 }
 
-                // Serialize the messages
-                session.MessagesJson = JsonSerializer.Serialize(context.Messages);
-
-                // Save changes
                 await _dbContext.SaveChangesAsync();
 
-                return true;
+                _logger.LogDebug("Saved context for {SessionId} with {MessageCount} messages",
+                    context.SessionId, context.Messages.Count);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error saving context for session {SessionId}", context.SessionId);
+                _logger.LogError(ex, "Error saving session context for {SessionId}", context.SessionId);
                 throw;
             }
         }
 
-        public async Task<List<string>> GetSessionIdsAsync(string? username = null)
+        public async Task UpdateContextAsync(string sessionId, string userInput, string assistantResponse)
         {
-            try
-            {
-                // Query for sessions
-                IQueryable<Session> query = _dbContext.Sessions;
+            var context = await GetSessionContextAsync(sessionId);
 
-                // Filter by username if provided
-                if (!string.IsNullOrEmpty(username))
-                {
-                    query = query.Where(s => s.Username == username);
-                }
-
-                // Get the session IDs
-                return await query
-                    .OrderByDescending(s => s.UpdatedAt)
-                    .Select(s => s.SessionId)
-                    .ToListAsync();
-            }
-            catch (Exception ex)
+            // Add user message
+            context.Messages.Add(new Message
             {
-                _logger.LogError(ex, "Error getting session IDs for user {Username}", username);
-                throw;
-            }
+                Role = "user",
+                Content = userInput,
+                Timestamp = DateTime.UtcNow,
+                TokenCount = _tokenManager.CountTokens(userInput)
+            });
+
+            // Add assistant message
+            context.Messages.Add(new Message
+            {
+                Role = "assistant",
+                Content = assistantResponse,
+                Timestamp = DateTime.UtcNow,
+                TokenCount = _tokenManager.CountTokens(assistantResponse)
+            });
+
+            context.LastUpdatedAt = DateTime.UtcNow;
+            context.TotalTokens = _tokenManager.CountContextTokens(context);
+
+            await SaveContextAsync(context);
         }
 
-        public async Task<bool> DeleteContextAsync(string sessionId)
+        public async Task<bool> DeleteSessionAsync(string sessionId)
         {
             try
             {
-                // Find the session in the database
-                var session = await _dbContext.Sessions
-                    .FirstOrDefaultAsync(s => s.SessionId == sessionId);
+                var sessionData = await _dbContext.Sessions.FirstOrDefaultAsync(s => s.SessionId == sessionId);
 
-                if (session == null)
+                if (sessionData == null)
                 {
-                    _logger.LogInformation("Session {SessionId} not found for deletion", sessionId);
                     return false;
                 }
 
-                // Remove the session
-                _dbContext.Sessions.Remove(session);
+                _dbContext.Sessions.Remove(sessionData);
                 await _dbContext.SaveChangesAsync();
+
+                _logger.LogInformation("Deleted session {SessionId}", sessionId);
 
                 return true;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error deleting context for session {SessionId}", sessionId);
-                throw;
+                _logger.LogError(ex, "Error deleting session {SessionId}", sessionId);
+                return false;
             }
         }
     }
 }
+
+
+
+

@@ -12,3 +12,4 @@ namespace MCPServer.Core.Features.Rag.Services.Interfaces
         Task<string> GenerateAnswerWithContextAsync(string question, string sessionId);
     }
 }
+

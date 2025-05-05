@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using MCPServer.Core.Models.Rag;
-using MCPServer.Core.Services.Interfaces;
+using MCPServer.Core.Features.Shared.Services.Interfaces;
 
 namespace MCPServer.Core.Data.Repositories
 {
@@ -26,3 +26,4 @@ namespace MCPServer.Core.Data.Repositories
         Task<IEnumerable<Chunk>> GetChunksByMetadataAsync(Dictionary<string, string> metadata);
     }
 }
+

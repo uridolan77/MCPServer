@@ -12,3 +12,4 @@ namespace MCPServer.Core.Features.Auth.Services.Interfaces
         List<LlmMessage> ConvertToLlmMessages(List<Message> messages, string newUserInput);
     }
 }
+

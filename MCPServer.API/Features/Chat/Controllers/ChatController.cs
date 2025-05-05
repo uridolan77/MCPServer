@@ -8,6 +8,7 @@ using MCPServer.Core.Models;
 using MCPServer.Core.Models.Chat;
 using MCPServer.Core.Models.Llm;
 using MCPServer.Core.Services.Interfaces;
+using MCPServer.Core.Features.Shared.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -145,14 +146,14 @@ namespace MCPServer.API.Features.Chat.Controllers
                             Content = request.SystemPrompt,
                             Timestamp = DateTime.UtcNow
                         };
-                        
+
                         // Add system message at the beginning of the history
                         sessionHistory.Insert(0, systemMessage);
                     }
                     else if (sessionHistory[0].Role == "system" && sessionHistory[0].Content != request.SystemPrompt)
                     {
                         // Update the existing system message if it changed
-                        _logger.LogInformation("Updating system prompt for session {SessionId} from '{OldPrompt}' to '{NewPrompt}'", 
+                        _logger.LogInformation("Updating system prompt for session {SessionId} from '{OldPrompt}' to '{NewPrompt}'",
                             request.SessionId, sessionHistory[0].Content, request.SystemPrompt);
                         sessionHistory[0].Content = request.SystemPrompt;
                         sessionHistory[0].Timestamp = DateTime.UtcNow;
@@ -327,7 +328,7 @@ namespace MCPServer.API.Features.Chat.Controllers
                             Content = chatRequest.SystemPrompt,
                             Timestamp = DateTime.UtcNow
                         };
-                        
+
                         // Add system message at the beginning of the history
                         sessionHistory.Insert(0, systemMessage);
                     }

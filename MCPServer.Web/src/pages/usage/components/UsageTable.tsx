@@ -53,9 +53,35 @@ const UsageTable: React.FC = () => {
 
   // Helper function to determine which logs to use
   const determineLogsSource = () => {
-    return chatUsageLogs && chatUsageLogs.length > 0
-      ? { logs: filteredChatLogs || [], type: 'chat' }
-      : { logs: filteredUsageLogs || [], type: 'llm' };
+    // Add debug logging to check what we're receiving
+    console.log('Checking logs availability:', { 
+      chatUsageLogs, 
+      filteredChatLogs, 
+      usageLogs, 
+      filteredUsageLogs 
+    });
+    
+    // First, check if we have any filtered chat logs
+    if (filteredChatLogs && filteredChatLogs.length > 0) {
+      console.log('Using filtered chat logs:', filteredChatLogs);
+      return { logs: filteredChatLogs, type: 'chat' };
+    }
+    
+    // Then check if we have any chat logs at all
+    if (chatUsageLogs && chatUsageLogs.length > 0) {
+      console.log('Using all chat logs:', chatUsageLogs);
+      return { logs: chatUsageLogs, type: 'chat' };
+    }
+    
+    // If no chat logs, check filtered LLM logs
+    if (filteredUsageLogs && filteredUsageLogs.length > 0) {
+      console.log('Using filtered LLM logs:', filteredUsageLogs);
+      return { logs: filteredUsageLogs, type: 'llm' };
+    }
+    
+    // Fall back to all LLM logs
+    console.log('Using all LLM logs:', usageLogs);
+    return { logs: usageLogs || [], type: 'llm' };
   };
 
   // Get appropriate logs based on priority
@@ -135,39 +161,41 @@ const UsageTable: React.FC = () => {
 
   // Calculate totals for ALL filtered logs, not just the current page
   const calculateTotals = () => {
-    return filteredLogs.reduce(
-      (totals, log) => {
-        if (type === 'chat') {
-          const chatLog = log as ChatUsageLog;
-          totals.inputTokens += chatLog.inputTokenCount || 0;
-          totals.outputTokens += chatLog.outputTokenCount || 0;
-          totals.totalTokens += (chatLog.inputTokenCount + chatLog.outputTokenCount) || 0;
-          totals.estimatedCost += chatLog.estimatedCost || 0;
-          totals.totalDuration += chatLog.duration || 0;
-          totals.totalSuccessful += chatLog.success ? 1 : 0;
-          totals.totalRequests += 1;
-        } else {
-          const llmLog = log as LlmUsageLog;
-          totals.inputTokens += llmLog.inputTokens || 0;
-          totals.outputTokens += llmLog.outputTokens || 0;
-          totals.totalTokens += llmLog.totalTokens || 0;
-          totals.estimatedCost += llmLog.estimatedCost || 0;
-          totals.totalDuration += llmLog.durationMs || 0;
-          totals.totalSuccessful += (llmLog.status === 'Success' || llmLog.status === 'Succeeded') ? 1 : 0;
-          totals.totalRequests += 1;
+    // Just directly sum the raw values from the logs
+    const totals = {
+      inputTokens: 0,
+      outputTokens: 0,
+      totalTokens: 0,
+      estimatedCost: 0,
+      totalDuration: 0,
+      totalSuccessful: 0,
+      totalRequests: filteredLogs.length
+    };
+    
+    filteredLogs.forEach(log => {
+      if (type === 'chat') {
+        const chatLog = log as ChatUsageLog;
+        // Simply add the raw values directly without any transformations
+        if ((chatLog as any).inputTokens) totals.inputTokens += (chatLog as any).inputTokens;
+        if ((chatLog as any).outputTokens) totals.outputTokens += (chatLog as any).outputTokens;
+        if ((chatLog as any).inputTokens && (chatLog as any).outputTokens) {
+          totals.totalTokens += (chatLog as any).inputTokens + (chatLog as any).outputTokens;
         }
-        return totals;
-      },
-      { 
-        inputTokens: 0, 
-        outputTokens: 0, 
-        totalTokens: 0, 
-        estimatedCost: 0,
-        totalDuration: 0,
-        totalSuccessful: 0,
-        totalRequests: 0
+        if (chatLog.estimatedCost) totals.estimatedCost += chatLog.estimatedCost;
+        if (chatLog.duration) totals.totalDuration += chatLog.duration;
+        if (chatLog.success) totals.totalSuccessful++;
+      } else {
+        const llmLog = log as LlmUsageLog;
+        if (llmLog.inputTokens) totals.inputTokens += llmLog.inputTokens;
+        if (llmLog.outputTokens) totals.outputTokens += llmLog.outputTokens;
+        if (llmLog.totalTokens) totals.totalTokens += llmLog.totalTokens;
+        if (llmLog.estimatedCost) totals.estimatedCost += llmLog.estimatedCost;
+        if (llmLog.durationMs) totals.totalDuration += llmLog.durationMs;
+        if (llmLog.status === 'Success' || llmLog.status === 'Succeeded') totals.totalSuccessful++;
       }
-    );
+    });
+    
+    return totals;
   };
 
   const totals = calculateTotals();
@@ -202,40 +230,54 @@ const UsageTable: React.FC = () => {
     if (type === 'chat') {
       return filteredLogs
         .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-        .map((log: ChatUsageLog) => (
-          <TableRow key={log.id}>
-            <TableCell>{formatDateTime(log.timestamp)}</TableCell>
-            <TableCell>{log.modelName}</TableCell>
-            <TableCell sx={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {log.message?.length > 50 ? `${log.message.substring(0, 50)}...` : log.message}
-            </TableCell>
-            <TableCell sx={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {log.response?.length > 50 ? `${log.response.substring(0, 50)}...` : log.response}
-            </TableCell>
-            <TableCell>{log.duration} ms</TableCell>
-            <TableCell>{log.inputTokenCount?.toLocaleString() || 0}</TableCell>
-            <TableCell>{log.outputTokenCount?.toLocaleString() || 0}</TableCell>
-            <TableCell>{(log.inputTokenCount + log.outputTokenCount)?.toLocaleString() || 0}</TableCell>
-            <TableCell>${log.estimatedCost?.toFixed(5) || "0.00000"}</TableCell>
-            <TableCell>
-              <Chip
-                size="small"
-                label={log.success ? "Success" : "Failed"}
-                color={log.success ? 'success' : 'error'}
-                icon={log.success ? <SuccessIcon /> : <ErrorIcon />}
-              />
-            </TableCell>
-            <TableCell align="right">
-              <IconButton 
-                size="small" 
-                onClick={() => handleOpenDetails(log)}
-                title="View Details"
-              >
-                <VisibilityIcon fontSize="small" />
-              </IconButton>
-            </TableCell>
-          </TableRow>
-        ));
+        .map((log: ChatUsageLog) => {
+          // Log the raw data for debugging
+          console.log('Raw log data:', log);
+          
+          // Use inputTokens and outputTokens (from API) instead of inputTokenCount/outputTokenCount
+          const inputTokens = (log as any).inputTokens;
+          const outputTokens = (log as any).outputTokens;
+          const totalTokens = inputTokens + outputTokens;
+          
+          return (
+            <TableRow key={log.id}>
+              <TableCell>{formatDateTime(log.timestamp)}</TableCell>
+              <TableCell>{log.modelName}</TableCell>
+              <TableCell sx={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {log.message?.length > 50 ? `${log.message.substring(0, 50)}...` : log.message}
+              </TableCell>
+              <TableCell sx={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {log.response?.length > 50 ? `${log.response.substring(0, 50)}...` : log.response}
+              </TableCell>
+              <TableCell>{(log as any).durationMs || log.duration} ms</TableCell>
+              
+              {/* Display token counts using the correct property names from API */}
+              <TableCell>{inputTokens}</TableCell>
+              <TableCell>{outputTokens}</TableCell>
+              <TableCell>{totalTokens}</TableCell>
+              
+              <TableCell>${log.estimatedCost}</TableCell>
+              
+              <TableCell>
+                <Chip
+                  size="small"
+                  label={(log as any).isSuccessful !== undefined ? ((log as any).isSuccessful ? "Success" : "Failed") : (log.success ? "Success" : "Failed")}
+                  color={(log as any).isSuccessful !== undefined ? ((log as any).isSuccessful ? 'success' : 'error') : (log.success ? 'success' : 'error')}
+                  icon={(log as any).isSuccessful !== undefined ? ((log as any).isSuccessful ? <SuccessIcon /> : <ErrorIcon />) : (log.success ? <SuccessIcon /> : <ErrorIcon />)}
+                />
+              </TableCell>
+              <TableCell align="right">
+                <IconButton 
+                  size="small" 
+                  onClick={() => handleOpenDetails(log)}
+                  title="View Details"
+                >
+                  <VisibilityIcon fontSize="small" />
+                </IconButton>
+              </TableCell>
+            </TableRow>
+          );
+        });
     }
     
     // Legacy LLM logs display
@@ -330,19 +372,19 @@ const UsageTable: React.FC = () => {
                 <TableCell component="th" scope="row" sx={{ fontWeight: 'bold' }}>
                   Input Tokens
                 </TableCell>
-                <TableCell>{chatLog.inputTokenCount?.toLocaleString() || 0}</TableCell>
+                <TableCell>{(chatLog as any).inputTokens?.toLocaleString() || 0}</TableCell>
               </TableRow>
               <TableRow>
                 <TableCell component="th" scope="row" sx={{ fontWeight: 'bold' }}>
                   Output Tokens
                 </TableCell>
-                <TableCell>{chatLog.outputTokenCount?.toLocaleString() || 0}</TableCell>
+                <TableCell>{(chatLog as any).outputTokens?.toLocaleString() || 0}</TableCell>
               </TableRow>
               <TableRow>
                 <TableCell component="th" scope="row" sx={{ fontWeight: 'bold' }}>
                   Total Tokens
                 </TableCell>
-                <TableCell>{(chatLog.inputTokenCount + chatLog.outputTokenCount)?.toLocaleString() || 0}</TableCell>
+                <TableCell>{((chatLog as any).inputTokens + (chatLog as any).outputTokens)?.toLocaleString() || 0}</TableCell>
               </TableRow>
               <TableRow>
                 <TableCell component="th" scope="row" sx={{ fontWeight: 'bold' }}>
@@ -524,10 +566,10 @@ const UsageTable: React.FC = () => {
                     } 
                   }}>
                     <TableCell colSpan={5} align="right">Totals ({totals.totalRequests} requests):</TableCell>
-                    <TableCell>{totals.inputTokens.toLocaleString()}</TableCell>
-                    <TableCell>{totals.outputTokens.toLocaleString()}</TableCell>
-                    <TableCell>{totals.totalTokens.toLocaleString()}</TableCell>
-                    <TableCell>${totals.estimatedCost.toFixed(5)}</TableCell>
+                    <TableCell>{totals.inputTokens}</TableCell>
+                    <TableCell>{totals.outputTokens}</TableCell>
+                    <TableCell>{totals.totalTokens}</TableCell>
+                    <TableCell>${totals.estimatedCost}</TableCell>
                     <TableCell colSpan={2}>
                       {Math.round((totals.totalSuccessful / totals.totalRequests) * 100)}% success
                     </TableCell>
@@ -541,12 +583,12 @@ const UsageTable: React.FC = () => {
                     }
                   }}>
                     <TableCell colSpan={5} align="right">Averages:</TableCell>
-                    <TableCell>{totals.totalRequests ? Math.round(totals.inputTokens / totals.totalRequests).toLocaleString() : 0}</TableCell>
-                    <TableCell>{totals.totalRequests ? Math.round(totals.outputTokens / totals.totalRequests).toLocaleString() : 0}</TableCell>
-                    <TableCell>{totals.totalRequests ? Math.round(totals.totalTokens / totals.totalRequests).toLocaleString() : 0}</TableCell>
-                    <TableCell>${totals.totalRequests ? (totals.estimatedCost / totals.totalRequests).toFixed(5) : "0.00000"}</TableCell>
+                    <TableCell>{totals.totalRequests ? totals.inputTokens / totals.totalRequests : 0}</TableCell>
+                    <TableCell>{totals.totalRequests ? totals.outputTokens / totals.totalRequests : 0}</TableCell>
+                    <TableCell>{totals.totalRequests ? totals.totalTokens / totals.totalRequests : 0}</TableCell>
+                    <TableCell>${totals.totalRequests ? totals.estimatedCost / totals.totalRequests : 0}</TableCell>
                     <TableCell colSpan={2}>
-                      {totals.totalRequests ? Math.round(totals.totalDuration / totals.totalRequests) : 0} ms avg
+                      {totals.totalRequests ? totals.totalDuration / totals.totalRequests : 0} ms avg
                     </TableCell>
                   </TableRow>
                 </TableFooter>

@@ -1,10 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using MCPServer.API.Controllers;
-using MCPServer.Core.Features.Usage.Services.Interfaces;
+using MCPServer.API.Features.Shared;
 using MCPServer.Core.Models;
 using MCPServer.Core.Models.Responses;
+using MCPServer.Core.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
@@ -17,12 +17,11 @@ namespace MCPServer.API.Features.Usage.Controllers
     public class UsageController : ApiControllerBase
     {
         private readonly IChatUsageService _chatUsageService;
-        private readonly ILogger<UsageController> _logger;
 
         public UsageController(IChatUsageService chatUsageService, ILogger<UsageController> logger)
+            : base(logger)
         {
             _chatUsageService = chatUsageService;
-            _logger = logger;
         }
 
         [HttpGet("stats")]
@@ -31,12 +30,12 @@ namespace MCPServer.API.Features.Usage.Controllers
             try
             {
                 var stats = await _chatUsageService.GetOverallStatsAsync();
-                return Success(stats, "Usage statistics retrieved successfully");
+                return SuccessResponse(stats, "Usage statistics retrieved successfully");
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error retrieving usage statistics");
-                return InternalServerError<ChatUsageStatsResponse>("Error retrieving usage statistics");
+                return ErrorResponse<ChatUsageStatsResponse>("Error retrieving usage statistics", ex);
             }
         }
 
@@ -54,12 +53,12 @@ namespace MCPServer.API.Features.Usage.Controllers
             {
                 var logs = await _chatUsageService.GetFilteredLogsAsync(
                     startDate, endDate, modelId, providerId, sessionId, page, pageSize);
-                return Success(logs, "Usage logs retrieved successfully");
+                return SuccessResponse(logs, "Usage logs retrieved successfully");
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error retrieving usage logs");
-                return InternalServerError<List<ChatUsageLogResponse>>("Error retrieving usage logs");
+                return ErrorResponse<List<ChatUsageLogResponse>>("Error retrieving usage logs", ex);
             }
         }
 
@@ -71,14 +70,14 @@ namespace MCPServer.API.Features.Usage.Controllers
                 var stats = await _chatUsageService.GetModelStatsAsync(modelId);
                 if (stats == null)
                 {
-                    return NotFound<ModelUsageStatResponse>($"No usage statistics found for model with ID {modelId}");
+                    return NotFoundResponse<ModelUsageStatResponse>($"No usage statistics found for model with ID {modelId}");
                 }
-                return Success(stats, "Model usage statistics retrieved successfully");
+                return SuccessResponse(stats, "Model usage statistics retrieved successfully");
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error retrieving model usage statistics for model ID {ModelId}", modelId);
-                return InternalServerError<ModelUsageStatResponse>("Error retrieving model usage statistics");
+                return ErrorResponse<ModelUsageStatResponse>("Error retrieving model usage statistics", ex);
             }
         }
 
@@ -90,14 +89,14 @@ namespace MCPServer.API.Features.Usage.Controllers
                 var stats = await _chatUsageService.GetProviderStatsAsync(providerId);
                 if (stats == null)
                 {
-                    return NotFound<ProviderUsageStatResponse>($"No usage statistics found for provider with ID {providerId}");
+                    return NotFoundResponse<ProviderUsageStatResponse>($"No usage statistics found for provider with ID {providerId}");
                 }
-                return Success(stats, "Provider usage statistics retrieved successfully");
+                return SuccessResponse(stats, "Provider usage statistics retrieved successfully");
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error retrieving provider usage statistics for provider ID {ProviderId}", providerId);
-                return InternalServerError<ProviderUsageStatResponse>("Error retrieving provider usage statistics");
+                return ErrorResponse<ProviderUsageStatResponse>("Error retrieving provider usage statistics", ex);
             }
         }
 
@@ -108,12 +107,12 @@ namespace MCPServer.API.Features.Usage.Controllers
             try
             {
                 var diagnostics = await _chatUsageService.GetDiagnosticInfoAsync();
-                return Success(diagnostics, "Diagnostic information retrieved successfully");
+                return SuccessResponse(diagnostics, "Diagnostic information retrieved successfully");
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error retrieving diagnostic information");
-                return InternalServerError<object>("Error retrieving diagnostic information");
+                return ErrorResponse<object>("Error retrieving diagnostic information", ex);
             }
         }
 
@@ -123,12 +122,12 @@ namespace MCPServer.API.Features.Usage.Controllers
             try
             {
                 var result = await _chatUsageService.FixCostsForFailedRequestsAsync();
-                return Success(result, "Costs for failed requests fixed successfully");
+                return SuccessResponse(result, "Costs for failed requests fixed successfully");
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error fixing costs for failed requests");
-                return InternalServerError<object>("Error fixing costs for failed requests");
+                return ErrorResponse<object>("Error fixing costs for failed requests", ex);
             }
         }
 
@@ -138,12 +137,12 @@ namespace MCPServer.API.Features.Usage.Controllers
             try
             {
                 var result = await _chatUsageService.GenerateSampleDataAsync(count);
-                return Success(result, $"Generated {count} sample usage logs successfully");
+                return SuccessResponse(result, $"Generated {count} sample usage logs successfully");
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error generating sample usage data");
-                return InternalServerError<object>("Error generating sample usage data");
+                return ErrorResponse<object>("Error generating sample usage data", ex);
             }
         }
 #endif

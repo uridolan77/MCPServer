@@ -1,5 +1,5 @@
 using System;
-using MCPServer.Core.Features.Rag.Services.Interfaces;
+using MCPServer.Core.Services.Interfaces;
 using MCPServer.Core.Services.Rag;
 using Microsoft.Extensions.DependencyInjection;
 

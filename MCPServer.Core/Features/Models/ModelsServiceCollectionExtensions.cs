@@ -1,7 +1,6 @@
 using System;
-using MCPServer.Core.Features.Models.Services;
-using MCPServer.Core.Features.Models.Services.Interfaces;
 using MCPServer.Core.Services;
+using MCPServer.Core.Services.Interfaces;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace MCPServer.Core.Features.Models
@@ -24,7 +23,7 @@ namespace MCPServer.Core.Features.Models
             }
 
             // Register model services
-            services.AddScoped<IModelService, ModelService>();
+            services.AddScoped<IModelService, MCPServer.Core.Services.ModelService>();
 
             return services;
         }

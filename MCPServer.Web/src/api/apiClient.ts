@@ -1,5 +1,6 @@
-import axios, { AxiosError, AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
+import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
 import { jwtDecode } from 'jwt-decode';
+import { API_BASE_URL } from '@/config';
 
 // Define token interface
 interface DecodedToken {
@@ -10,27 +11,28 @@ interface DecodedToken {
   email: string;
 }
 
-// Create axios instance
+// Create a customized axios instance
 const apiClient: AxiosInstance = axios.create({
-  baseURL: '/api', // Use relative URL to avoid CORS issues with the proxy
+  baseURL: API_BASE_URL,
+  timeout: 30000, // 30 seconds
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
-// Add request interceptor to add auth token
+// Log all requests in development mode
 apiClient.interceptors.request.use(
-  async (config) => {
+  (config) => {
     const token = localStorage.getItem('token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
 
-    // Log requests in development
-    if (process.env.NODE_ENV === 'development') {
-      console.log(`API Request [${config.method?.toUpperCase()}] ${config.url}`, config.params || '');
+    if (import.meta.env.DEV) {
+      console.log(`API Request: ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`, 
+        config.params ? `params: ${JSON.stringify(config.params)}` : '',
+        config.data ? `data: ${JSON.stringify(config.data)}` : '');
     }
-
     return config;
   },
   (error) => {
@@ -39,25 +41,37 @@ apiClient.interceptors.request.use(
   }
 );
 
-// Add response interceptor to handle token refresh
+// Log responses and handle errors
 apiClient.interceptors.response.use(
-  (response) => {
-    // Log successful responses in development
-    if (process.env.NODE_ENV === 'development') {
-      console.log(`API Response [${response.config.method?.toUpperCase()}] ${response.config.url}:`, response.data);
+  (response: AxiosResponse) => {
+    if (import.meta.env.DEV) {
+      console.log(`API Response from ${response.config.url}:`, 
+        response.data ? JSON.stringify(response.data).substring(0, 1000) + '...' : 'No data');
+
+      // Special debugging for chat logs endpoint
+      if (response.config.url?.includes('chat-usage/logs') || response.config.url?.includes('usage/logs')) {
+        console.log('DETAILED CHAT LOGS RESPONSE:', response.data);
+        
+        // Check different data structures
+        if (response.data && response.data.data && response.data.data.$values) {
+          console.log('Found nested $values array with', response.data.data.$values.length, 'items');
+        } else if (response.data && response.data.$values) {
+          console.log('Found direct $values array with', response.data.$values.length, 'items');
+        } else if (Array.isArray(response.data)) {
+          console.log('Response data is a direct array with', response.data.length, 'items');
+        }
+      }
     }
     return response;
   },
-  async (error: AxiosError) => {
-    // Log API errors in development
-    if (process.env.NODE_ENV === 'development') {
-      console.error('API Error:', {
-        status: error.response?.status,
-        statusText: error.response?.statusText,
-        url: error.config?.url,
-        method: error.config?.method?.toUpperCase(),
-        data: error.response?.data
-      });
+  async (error) => {
+    // Log the error
+    if (error.response) {
+      console.error('API Error Response:', error.response.status, error.response.data);
+    } else if (error.request) {
+      console.error('API No Response:', error.request);
+    } else {
+      console.error('API Request Error:', error.message);
     }
 
     const originalRequest = error.config as AxiosRequestConfig & { _retry?: boolean };

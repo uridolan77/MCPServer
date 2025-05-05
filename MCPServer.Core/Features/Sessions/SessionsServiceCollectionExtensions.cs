@@ -1,6 +1,6 @@
 using System;
-using MCPServer.Core.Features.Sessions.Services.Interfaces;
 using MCPServer.Core.Services;
+using MCPServer.Core.Services.Interfaces;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace MCPServer.Core.Features.Sessions
@@ -23,8 +23,8 @@ namespace MCPServer.Core.Features.Sessions
             }
 
             // Register session services
-            services.AddScoped<ISessionService, Services.SessionService>();
-            services.AddScoped<IContextService, Services.MySqlContextService>();
+            services.AddScoped<ISessionService, MCPServer.Core.Services.SessionService>();
+            services.AddScoped<IContextService, MCPServer.Core.Services.MySqlContextService>();
 
             return services;
         }

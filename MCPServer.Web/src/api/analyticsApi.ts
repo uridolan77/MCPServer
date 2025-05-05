@@ -95,6 +95,42 @@ export interface DailyUsage {
   cost: number;
 }
 
+// Helper function to extract the actual logs array from various response structures
+const extractLogsFromResponse = (response: any): ChatUsageLog[] => {
+  console.log('Response structure:', JSON.stringify(response).substring(0, 200) + '...');
+  
+  if (!response) {
+    return [];
+  }
+  
+  // Case 1: Direct array
+  if (Array.isArray(response)) {
+    console.log('Found direct array structure');
+    return response;
+  }
+  
+  // Case 2: Response with data.$values structure (most likely)
+  if (response.data && response.data.$values) {
+    console.log('Found nested data.$values structure');
+    return response.data.$values;
+  }
+  
+  // Case 3: Response with data array
+  if (response.data && Array.isArray(response.data)) {
+    console.log('Found data array structure');
+    return response.data;
+  }
+  
+  // Case 4: Top-level $values array
+  if (response.$values) {
+    console.log('Found top-level $values structure');
+    return response.$values;
+  }
+  
+  console.warn('Unable to extract logs from response, returning empty array');
+  return [];
+};
+
 export const analyticsApi = {
   // Get overall usage statistics
   getOverallStats: async (): Promise<OverallStats> => {
@@ -156,39 +192,11 @@ export const analyticsApi = {
       }
 
       const response = await apiClient.get(url);
+      console.log('Chat logs response received:', response);
 
-      let responseData = [];
-
-      // Handle response format that might have $values property
-      if (response.data && response.data.$values) {
-        responseData = response.data.$values;
-      }
-      // If it's already an array, use it
-      else if (Array.isArray(response.data)) {
-        responseData = response.data;
-      }
-
-      // Map response data to ensure all fields are properly mapped
-      const chatLogs: ChatUsageLog[] = responseData.map((log: any) => ({
-        id: log.id,
-        sessionId: log.sessionId,
-        userId: log.userId,
-        modelId: log.modelId,
-        modelName: log.modelName || log.model || "Unknown",
-        providerId: log.providerId,
-        providerName: log.providerName || log.provider || "Unknown",
-        message: log.message || "",
-        response: log.response || "",
-        inputTokenCount: log.inputTokens || log.inputTokenCount || 0,
-        outputTokenCount: log.outputTokens || log.outputTokenCount || 0,
-        estimatedCost: log.estimatedCost || 0,
-        duration: log.durationMs || log.duration || 0,
-        success: log.isSuccessful !== undefined ? log.isSuccessful : log.success !== undefined ? log.success : true,
-        errorMessage: log.errorMessage || "",
-        timestamp: log.timestamp || new Date().toISOString()
-      }));
-
-      return chatLogs;
+      const logs = extractLogsFromResponse(response.data);
+      console.log(`Extracted ${logs.length} logs from response`);
+      return logs;
     } catch (error) {
       console.error('Error fetching chat usage logs:', error);
       return [];

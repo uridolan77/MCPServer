@@ -13,25 +13,16 @@ using MCPServer.Core.Services.Interfaces;
 using MCPServer.Core.Services.Llm;
 using MCPServer.Core.Services.Rag;
 using MCPServer.Core.Features.Auth;
-using MCPServer.Core.Features.Auth.Services;
-using MCPServer.Core.Features.Auth.Services.Interfaces;
 using MCPServer.Core.Features.Shared;
 using MCPServer.Core.Features.Shared.Services;
 using MCPServer.Core.Features.Shared.Services.Interfaces;
 using MCPServer.Core.Features.Chat;
-using MCPServer.Core.Features.Chat.Services.Interfaces;
 using MCPServer.Core.Features.Llm;
-using MCPServer.Core.Features.Llm.Services.Interfaces;
 using MCPServer.Core.Features.Models;
-using MCPServer.Core.Features.Models.Services.Interfaces;
 using MCPServer.Core.Features.Providers;
-using MCPServer.Core.Features.Providers.Services.Interfaces;
 using MCPServer.Core.Features.Rag;
-using MCPServer.Core.Features.Rag.Services.Interfaces;
 using MCPServer.Core.Features.Sessions;
-using MCPServer.Core.Features.Sessions.Services.Interfaces;
 using MCPServer.Core.Features.Usage;
-using MCPServer.Core.Features.Usage.Services.Interfaces;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
@@ -235,6 +226,18 @@ builder.Services.AddAuthentication(options =>
 
 // Register LLM services
 builder.Services.AddLlmServices();
+
+// Register LLM service explicitly
+builder.Services.AddScoped<MCPServer.Core.Services.Interfaces.ILlmService, MCPServer.Core.Services.LlmService>();
+
+// Register TokenManager service explicitly
+builder.Services.AddSingleton<MCPServer.Core.Services.Interfaces.ITokenManager, MCPServer.Core.Services.TokenManager>();
+
+// Register SessionContextService explicitly
+builder.Services.AddScoped<MCPServer.Core.Services.Interfaces.ISessionContextService, MCPServer.Core.Services.SessionContextService>();
+
+// Register ChatUsageService explicitly
+builder.Services.AddScoped<MCPServer.Core.Services.Interfaces.IChatUsageService, MCPServer.Core.Services.ChatUsageService>();
 
 // Register provider services
 builder.Services.AddProviderServices();

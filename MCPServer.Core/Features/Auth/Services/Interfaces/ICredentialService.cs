@@ -61,3 +61,4 @@ namespace MCPServer.Core.Features.Auth.Services.Interfaces
         Task<bool> ValidateUserAccessAsync(int credentialId, Guid? userId, bool requireAdmin = false);
     }
 }
+

@@ -1,7 +1,6 @@
 using System;
-using MCPServer.Core.Features.Providers.Services;
-using MCPServer.Core.Features.Providers.Services.Interfaces;
 using MCPServer.Core.Services;
+using MCPServer.Core.Services.Interfaces;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace MCPServer.Core.Features.Providers
@@ -24,7 +23,7 @@ namespace MCPServer.Core.Features.Providers
             }
 
             // Register provider services
-            services.AddScoped<ILlmProviderService, LlmProviderService>();
+            services.AddScoped<ILlmProviderService, MCPServer.Core.Services.LlmProviderService>();
 
             return services;
         }

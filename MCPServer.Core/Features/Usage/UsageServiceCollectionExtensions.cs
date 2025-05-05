@@ -1,6 +1,6 @@
 using System;
-using MCPServer.Core.Features.Usage.Services;
-using MCPServer.Core.Features.Usage.Services.Interfaces;
+using MCPServer.Core.Services;
+using MCPServer.Core.Services.Interfaces;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace MCPServer.Core.Features.Usage

@@ -15,3 +15,4 @@ namespace MCPServer.Core.Features.Rag.Services.Interfaces
         Task<List<Chunk>> ChunkDocumentAsync(Document document, int chunkSize = 1000, int chunkOverlap = 200);
     }
 }
+

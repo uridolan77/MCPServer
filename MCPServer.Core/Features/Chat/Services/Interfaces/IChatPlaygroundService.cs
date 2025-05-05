@@ -34,3 +34,4 @@ namespace MCPServer.Core.Features.Chat.Services.Interfaces
         Task<bool> TestDatabaseConnectionAsync();
     }
 }
+

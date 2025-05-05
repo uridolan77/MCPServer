@@ -11,3 +11,4 @@ namespace MCPServer.Core.Features.Sessions.Services.Interfaces
         Task<bool> DeleteSessionAsync(string sessionId);
     }
 }
+

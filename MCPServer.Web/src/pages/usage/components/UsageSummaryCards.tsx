@@ -34,141 +34,39 @@ const UsageSummaryCards: React.FC = () => {
     activeTabIndex
   } = useUsageContext();
   
-  // Calculate chat-specific metrics from filtered chat logs
-  const chatMetrics = useMemo(() => {
-    if (!Array.isArray(filteredChatLogs) || filteredChatLogs.length === 0) {
-      return {
-        totalMessages: 0,
-        avgResponseLength: 0,
-        avgResponseTime: 0,
-        topModels: []
-      };
-    }
-
-    const totalMessages = filteredChatLogs.length;
-    
-    // Calculate average response length (in characters)
-    const totalResponseLength = filteredChatLogs.reduce(
-      (sum, log) => sum + (log.response?.length || 0), 
-      0
-    );
-    const avgResponseLength = totalResponseLength / totalMessages;
-    
-    // Calculate average response time
-    const totalResponseTime = filteredChatLogs.reduce(
-      (sum, log) => sum + (log.duration || 0), 
-      0
-    );
-    const avgResponseTime = totalResponseTime / totalMessages;
-    
-    // Get model usage counts
-    const modelCounts = filteredChatLogs.reduce((acc, log) => {
-      const modelName = log.modelName || 'Unknown';
-      acc[modelName] = (acc[modelName] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
-    
-    // Convert to array and sort
-    const topModels = Object.entries(modelCounts)
-      .map(([name, count]) => ({ name, count }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 3);
-      
-    return {
-      totalMessages,
-      avgResponseLength,
-      avgResponseTime,
-      topModels
-    };
-  }, [filteredChatLogs]);
-  
   // Calculate summary metrics from filtered data
   const summaryMetrics = useMemo(() => {
-    // Use the original data arrays if they exist, as filteredLogs might be filtered by search
-    // Always prioritize chat logs if available
+    console.log('Raw data:', {
+      chatUsageLogs,
+      filteredChatLogs
+    });
+    
+    // Directly use chat logs if available
     if (Array.isArray(chatUsageLogs) && chatUsageLogs.length > 0) {
-      // Use the full chatUsageLogs array to calculate totals, not just filtered ones
-      const logsToCalculate = activeTabIndex === TAB_LOGS_VIEW && filteredChatLogs?.length > 0 ? 
-        filteredChatLogs : chatUsageLogs;
+      // Use chat logs array for totals
+      const totalRequests = chatUsageLogs.length;
       
-      const totalRequests = logsToCalculate.length;
+      // Directly expose the values without any calculation
+      // Just sum the raw values from the API
+      let totalTokens = 0;
+      let totalCost = 0;
+      let successfulRequests = 0;
       
-      // Calculate total tokens
-      const totalTokens = logsToCalculate.reduce(
-        (sum, log) => sum + ((log.inputTokenCount || 0) + (log.outputTokenCount || 0)), 
-        0
-      );
+      chatUsageLogs.forEach(log => {
+        // Use the raw values directly
+        if (log.inputTokenCount) totalTokens += log.inputTokenCount;
+        if (log.outputTokenCount) totalTokens += log.outputTokenCount;
+        if (log.estimatedCost) totalCost += log.estimatedCost;
+        if (log.success) successfulRequests++;
+      });
       
-      // Calculate total cost
-      const totalCost = logsToCalculate.reduce(
-        (sum, log) => sum + (log.estimatedCost || 0), 
-        0
-      );
-      
-      // Calculate success rate
-      const successRate = calculateSuccessRate(logsToCalculate);
+      const successRate = (totalRequests > 0) ? (successfulRequests / totalRequests) * 100 : 0;
       
       return {
         totalRequests,
         totalTokens,
         totalCost,
         successRate
-      };
-    } 
-    else if (activeTabIndex === TAB_LOGS_VIEW && Array.isArray(filteredUsageLogs) && filteredUsageLogs.length > 0) {
-      const totalRequests = filteredUsageLogs.length;
-      
-      // Calculate tokens with appropriate fallbacks for various field names
-      const totalTokens = filteredUsageLogs.reduce(
-        (sum, log) => {
-          if (log.totalTokens !== undefined) {
-            return sum + (log.totalTokens || 0);
-          } else {
-            // If totalTokens isn't available, try to calculate from input + output
-            return sum + ((log.inputTokens || 0) + (log.outputTokens || 0));
-          }
-        }, 
-        0
-      );
-      
-      // Calculate cost
-      const totalCost = filteredUsageLogs.reduce(
-        (sum, log) => sum + (log.estimatedCost || 0), 
-        0
-      );
-      
-      // Calculate success rate
-      const successfulRequests = filteredUsageLogs.filter(
-        log => log.status === 'Success' || log.status === 'Succeeded' || log.success === true
-      ).length;
-      
-      const successRate = totalRequests > 0 ? (successfulRequests / totalRequests) * 100 : 0;
-      
-      return {
-        totalRequests,
-        totalTokens,
-        totalCost,
-        successRate
-      };
-    }
-    
-    // If no filtered data is available, but we have dashboard stats
-    if (dashboardStats) {
-      return {
-        totalRequests: dashboardStats.totalMessages,
-        totalTokens: dashboardStats.totalTokens,
-        totalCost: dashboardStats.totalCost,
-        successRate: dashboardStats.successRate
-      };
-    }
-    
-    // Fall back to overall stats
-    if (overallStats) {
-      return {
-        totalRequests: overallStats.totalMessages,
-        totalTokens: overallStats.totalTokensUsed,
-        totalCost: overallStats.totalCost,
-        successRate: 0 // Can't calculate success rate from overall stats
       };
     }
     
@@ -179,79 +77,38 @@ const UsageSummaryCards: React.FC = () => {
       totalCost: 0,
       successRate: 0
     };
-  }, [filteredUsageLogs, filteredChatLogs, chatUsageLogs, overallStats, dashboardStats, activeTabIndex]);
-  
-  // Helper function to calculate success rate from chat logs
-  function calculateSuccessRate(logs: any[]) {
-    if (!Array.isArray(logs) || logs.length === 0) return 0;
-    
-    const successfulLogs = logs.filter(log => 
-      log.success === true || log.status === 'Success' || log.status === 'Succeeded'
-    ).length;
-    
-    return (successfulLogs / logs.length) * 100;
-  }
+  }, [chatUsageLogs, filteredChatLogs]);
   
   // Configuration for summary cards - depends on which tab is active
   const summaryCards = useMemo(() => {
-    // Show chat-specific cards when on the Logs View tab
-    if (activeTabIndex === TAB_LOGS_VIEW) {
-      return [
-        {
-          title: 'Total Messages',
-          value: summaryMetrics.totalRequests.toLocaleString(),
-          icon: <ChatIcon />,
-          color: theme.palette.primary.main
-        },
-        {
-          title: 'Total Tokens',
-          value: summaryMetrics.totalTokens.toLocaleString(),
-          icon: <ListIcon />,
-          color: theme.palette.secondary.main
-        },
-        {
-          title: 'Estimated Cost',
-          value: `$${summaryMetrics.totalCost.toFixed(2)}`,
-          icon: <MoneyIcon />,
-          color: theme.palette.success.main
-        },
-        {
-          title: 'Success Rate',
-          value: `${summaryMetrics.successRate.toFixed(1)}%`,
-          icon: <SpeedIcon />,
-          color: theme.palette.info.main
-        }
-      ];
-    }
-  
-    // Default cards for other tabs
+    // Default cards that just show raw values
     return [
       {
-        title: 'Total Requests',
-        value: summaryMetrics.totalRequests.toLocaleString(),
-        icon: <AnalyticsIcon />,
+        title: 'Total Messages',
+        value: summaryMetrics.totalRequests,
+        icon: <ChatIcon />,
         color: theme.palette.primary.main
       },
       {
         title: 'Total Tokens',
-        value: summaryMetrics.totalTokens.toLocaleString(),
+        value: summaryMetrics.totalTokens,
         icon: <ListIcon />,
         color: theme.palette.secondary.main
       },
       {
         title: 'Estimated Cost',
-        value: `$${summaryMetrics.totalCost.toFixed(2)}`,
+        value: `$${summaryMetrics.totalCost}`,
         icon: <MoneyIcon />,
         color: theme.palette.success.main
       },
       {
         title: 'Success Rate',
         value: `${summaryMetrics.successRate.toFixed(1)}%`,
-        icon: <TimelineIcon />,
+        icon: <SpeedIcon />,
         color: theme.palette.info.main
       }
     ];
-  }, [activeTabIndex, summaryMetrics, theme.palette]);
+  }, [summaryMetrics, theme.palette]);
   
   return (
     <Grid container spacing={3} sx={{ mb: 3 }}>

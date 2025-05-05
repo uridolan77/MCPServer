@@ -83,7 +83,7 @@ const UsageTabs: React.FC = () => {
       try {
         setIsLoading(true);
         
-        return await analyticsApi.getChatUsageLogs(
+        const response = await analyticsApi.getChatUsageLogs(
           formatDateForApi(startDate),
           formatDateForApi(endDate),
           selectedModelId !== '' ? Number(selectedModelId) : undefined,
@@ -92,6 +92,26 @@ const UsageTabs: React.FC = () => {
           1,        // page
           200       // increased pageSize to get more results at once
         );
+
+        console.log('Raw API response:', response);
+
+        // Handle different response structures
+        if (response && response.data && response.data.$values) {
+          console.log('Detected nested response structure with $values array');
+          return response.data.$values;
+        } else if (response && response.data && Array.isArray(response.data)) {
+          console.log('Detected response with data array');
+          return response.data;
+        } else if (response && Array.isArray(response)) {
+          console.log('Detected direct array response');
+          return response;
+        } else if (response && response.$values) {
+          console.log('Detected top-level $values array');
+          return response.$values;
+        }
+        
+        console.warn('Unrecognized response structure:', response);
+        return [];
       } catch (error) {
         console.error('Error fetching chat usage logs:', error);
         handleError(error, 'Failed to fetch chat usage data');
@@ -190,21 +210,38 @@ const UsageTabs: React.FC = () => {
   // Update context with chat logs and apply filtering
   useEffect(() => {
     if (Array.isArray(chatLogs)) {
-      setChatUsageLogs(chatLogs);
+      console.log('Raw chat logs received:', chatLogs);
+      
+      // Check if logs are in a nested data structure (common API response pattern)
+      let logsToProcess = chatLogs;
+      if (chatLogs.data && Array.isArray(chatLogs.data.$values)) {
+        console.log('Found nested data structure with $values');
+        logsToProcess = chatLogs.data.$values;
+      }
+      
+      // Store all chat logs in context
+      setChatUsageLogs(logsToProcess);
       
       // Filter chat logs based on selected model and provider
       // (This is a backup in case the API doesn't support filtering)
-      const filtered = chatLogs.filter(log => {
-        const matchesModel = !selectedModelId || log.modelId === Number(selectedModelId);
-        const matchesProvider = !selectedProviderId || log.providerId === Number(selectedProviderId);
+      const filtered = logsToProcess.filter(log => {
+        // Only apply model filter if a model is selected
+        const matchesModel = !selectedModelId || selectedModelId === '' || 
+          log.modelId === Number(selectedModelId);
+        
+        // Only apply provider filter if a provider is selected
+        const matchesProvider = !selectedProviderId || selectedProviderId === '' || 
+          log.providerId === Number(selectedProviderId);
+        
         return matchesModel && matchesProvider;
       });
       
-      setFilteredChatLogs(filtered);
+      console.log(`Filtered chat logs: ${filtered.length} of ${logsToProcess.length} logs match filters.`, 
+        { modelFilter: selectedModelId, providerFilter: selectedProviderId, filtered });
       
-      // Log filtering details for debugging
-      console.log(`Filtered chat logs: ${filtered.length} of ${chatLogs.length} logs match filters.`,
-        { modelFilter: selectedModelId, providerFilter: selectedProviderId });
+      setFilteredChatLogs(filtered.length > 0 ? filtered : logsToProcess);
+    } else {
+      console.warn('Chat logs is not an array:', chatLogs);
     }
   }, [chatLogs, selectedModelId, selectedProviderId, setChatUsageLogs, setFilteredChatLogs]);
 

@@ -12,3 +12,4 @@ namespace MCPServer.Core.Features.Llm.Services.Interfaces
         Task StreamResponseAsync(LlmRequest request, Func<string, bool, Task> onChunkReceived);
     }
 }
+
