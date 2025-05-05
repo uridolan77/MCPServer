@@ -168,11 +168,14 @@ const ChatMessagesTable: React.FC = () => {
           </TableCell>
           <TableCell>{message.duration} ms</TableCell>
           <TableCell>
+            ${message.success ? (message.estimatedCost?.toFixed(5) || "0.00000") : "0.00000"}
+          </TableCell>
+          <TableCell>
             <Chip
               size="small"
-              label={message.success ? "Success" : "Failed"}
-              color={message.success ? 'success' : 'error'}
-              icon={message.success ? <SuccessIcon /> : <ErrorIcon />}
+              label={message.success && !message.response.includes("Error") ? "Success" : "Failed"}
+              color={message.success && !message.response.includes("Error") ? 'success' : 'error'}
+              icon={message.success && !message.response.includes("Error") ? <SuccessIcon /> : <ErrorIcon />}
             />
           </TableCell>
           <TableCell align="right">
@@ -197,13 +200,13 @@ const ChatMessagesTable: React.FC = () => {
         <Box mb={2}>
           <Typography variant="subtitle2">Time</Typography>
           <Typography variant="body2" gutterBottom>{formatDateTime(selectedMessage.timestamp)}</Typography>
-          
+
           <Typography variant="subtitle2">Session ID</Typography>
           <Typography variant="body2" gutterBottom>{selectedMessage.sessionId}</Typography>
-          
+
           <Typography variant="subtitle2">Model</Typography>
           <Typography variant="body2" gutterBottom>{selectedMessage.modelName} ({selectedMessage.providerName})</Typography>
-          
+
           <Typography variant="subtitle2">Status</Typography>
           <Chip
             size="small"
@@ -211,7 +214,7 @@ const ChatMessagesTable: React.FC = () => {
             color={selectedMessage.success ? 'success' : 'error'}
             sx={{ mb: 1 }}
           />
-          
+
           {selectedMessage.errorMessage && (
             <>
               <Typography variant="subtitle2">Error</Typography>
@@ -223,18 +226,23 @@ const ChatMessagesTable: React.FC = () => {
 
           <Typography variant="subtitle2">Performance</Typography>
           <Typography variant="body2" gutterBottom>
-            Duration: {selectedMessage.duration} ms | 
-            Tokens: {selectedMessage.inputTokenCount} in / {selectedMessage.outputTokenCount} out | 
-            Cost: ${selectedMessage.estimatedCost?.toFixed(5) || "0.00000"}
+            Duration: {selectedMessage.duration} ms |
+            Tokens: {selectedMessage.inputTokenCount} in / {selectedMessage.outputTokenCount} out |
+            Cost: ${selectedMessage.success ? (selectedMessage.estimatedCost?.toFixed(5) || "0.00000") : "0.00000"}
+            {!selectedMessage.success && selectedMessage.estimatedCost > 0 && (
+              <span style={{ color: 'red', marginLeft: '5px' }}>
+                (Not charged - request failed)
+              </span>
+            )}
           </Typography>
         </Box>
 
-        <Box sx={{ 
-          display: 'flex', 
-          flexDirection: 'column', 
-          gap: 2, 
-          maxHeight: '60vh', 
-          overflow: 'auto' 
+        <Box sx={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 2,
+          maxHeight: '60vh',
+          overflow: 'auto'
         }}>
           <Paper sx={{ p: 2, backgroundColor: theme.palette.grey[50] }}>
             <Typography variant="subtitle1" sx={{ mb: 1, display: 'flex', alignItems: 'center' }}>
@@ -244,19 +252,19 @@ const ChatMessagesTable: React.FC = () => {
               {selectedMessage.message}
             </Typography>
           </Paper>
-          
+
           <Paper sx={{ p: 2, backgroundColor: theme.palette.mode === 'light' ? theme.palette.primary.light : theme.palette.primary.dark }}>
-            <Typography variant="subtitle1" sx={{ 
-              mb: 1, 
-              display: 'flex', 
+            <Typography variant="subtitle1" sx={{
+              mb: 1,
+              display: 'flex',
               alignItems: 'center',
-              color: theme.palette.getContrastText(theme.palette.mode === 'light' ? theme.palette.primary.light : theme.palette.primary.dark) 
+              color: theme.palette.getContrastText(theme.palette.mode === 'light' ? theme.palette.primary.light : theme.palette.primary.dark)
             }}>
               <QuestionAnswerIcon fontSize="small" sx={{ mr: 1 }} /> AI Response
             </Typography>
-            <Typography variant="body2" sx={{ 
+            <Typography variant="body2" sx={{
               whiteSpace: 'pre-wrap',
-              color: theme.palette.getContrastText(theme.palette.mode === 'light' ? theme.palette.primary.light : theme.palette.primary.dark) 
+              color: theme.palette.getContrastText(theme.palette.mode === 'light' ? theme.palette.primary.light : theme.palette.primary.dark)
             }}>
               {selectedMessage.response}
             </Typography>
@@ -297,6 +305,7 @@ const ChatMessagesTable: React.FC = () => {
                   <TableCell>Message</TableCell>
                   <TableCell>Response</TableCell>
                   <TableCell>Duration</TableCell>
+                  <TableCell>Cost</TableCell>
                   <TableCell>Status</TableCell>
                   <TableCell align="right">Actions</TableCell>
                 </TableRow>

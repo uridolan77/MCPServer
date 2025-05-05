@@ -156,9 +156,9 @@ export const analyticsApi = {
       }
 
       const response = await apiClient.get(url);
-      
+
       let responseData = [];
-      
+
       // Handle response format that might have $values property
       if (response.data && response.data.$values) {
         responseData = response.data.$values;
@@ -243,7 +243,7 @@ export const analyticsApi = {
 
       try {
         const response = await apiClient.get<SessionData[]>(url);
-        
+
         // Handle response format that might have $values property
         if (response.data && response.data.$values) {
           return response.data.$values;
@@ -317,7 +317,7 @@ export const analyticsApi = {
       }
 
       const response = await apiClient.get<UsageMetric[]>(url);
-      
+
       // Handle response format that might have $values property
       if (response.data && response.data.$values) {
         return response.data.$values;
@@ -343,28 +343,28 @@ export const analyticsApi = {
     try {
       // Get overall stats
       const overallStats = await analyticsApi.getOverallStats();
-      
+
       // Get recent logs (last 5)
       const recentLogs = await analyticsApi.getChatUsageLogs(startDate, endDate, undefined, undefined, undefined, 1, 5);
-      
+
       // Calculate daily usage stats
       const allLogs = await analyticsApi.getChatUsageLogs(startDate, endDate);
       const dailyUsage = calculateDailyUsage(allLogs);
-      
+
       // Calculate average response time
       const avgResponseTime = calculateAverageResponseTime(allLogs);
-      
+
       // Calculate success rate
       const successRate = calculateSuccessRate(allLogs);
-      
+
       // Get sessions count
       const sessions = await analyticsApi.getAllSessions();
-      
+
       // Fix for modelStats not being an array or being undefined
-      const topModels = Array.isArray(overallStats?.modelStats) 
+      const topModels = Array.isArray(overallStats?.modelStats)
         ? overallStats.modelStats.sort((a, b) => b.totalTokens - a.totalTokens).slice(0, 5)
         : [];
-      
+
       return {
         totalSessions: sessions.length,
         totalMessages: overallStats.totalMessages,
@@ -396,10 +396,10 @@ export const analyticsApi = {
 // Helper functions for data processing
 function calculateDailyUsage(logs: ChatUsageLog[]): DailyUsage[] {
   const dailyMap: Record<string, DailyUsage> = {};
-  
+
   logs.forEach(log => {
     const date = new Date(log.timestamp).toLocaleDateString();
-    
+
     if (!dailyMap[date]) {
       dailyMap[date] = {
         date,
@@ -408,27 +408,33 @@ function calculateDailyUsage(logs: ChatUsageLog[]): DailyUsage[] {
         cost: 0
       };
     }
-    
+
     dailyMap[date].messages += 1;
     dailyMap[date].tokens += log.inputTokenCount + log.outputTokenCount;
     dailyMap[date].cost += log.estimatedCost;
   });
-  
-  return Object.values(dailyMap).sort((a, b) => 
+
+  return Object.values(dailyMap).sort((a, b) =>
     new Date(a.date).getTime() - new Date(b.date).getTime()
   );
 }
 
 function calculateAverageResponseTime(logs: ChatUsageLog[]): number {
   if (logs.length === 0) return 0;
-  
+
   const totalDuration = logs.reduce((sum, log) => sum + log.duration, 0);
   return totalDuration / logs.length;
 }
 
 function calculateSuccessRate(logs: ChatUsageLog[]): number {
   if (logs.length === 0) return 0;
-  
-  const successfulLogs = logs.filter(log => log.success).length;
+
+  const successfulLogs = logs.filter(log =>
+    log.success &&
+    !log.response.includes("Error") &&
+    !log.response.includes("error") &&
+    !log.errorMessage
+  ).length;
+
   return (successfulLogs / logs.length) * 100;
 }

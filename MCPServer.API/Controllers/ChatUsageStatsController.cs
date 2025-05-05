@@ -83,12 +83,12 @@ namespace MCPServer.API.Controllers
             {
                 _logger.LogInformation("Getting usage statistics for model {ModelId}", modelId);
                 var stats = await _chatUsageService.GetModelStatsAsync(modelId);
-                
+
                 if (stats == null)
                 {
                     return NotFound($"No usage data found for model with ID {modelId}");
                 }
-                
+
                 return Ok(stats);
             }
             catch (Exception ex)
@@ -106,12 +106,12 @@ namespace MCPServer.API.Controllers
             {
                 _logger.LogInformation("Getting usage statistics for provider {ProviderId}", providerId);
                 var stats = await _chatUsageService.GetProviderStatsAsync(providerId);
-                
+
                 if (stats == null)
                 {
                     return NotFound($"No usage data found for provider with ID {providerId}");
                 }
-                
+
                 return Ok(stats);
             }
             catch (Exception ex)
@@ -173,6 +173,52 @@ namespace MCPServer.API.Controllers
             {
                 _logger.LogError(ex, "Error fixing costs for failed requests");
                 return StatusCode(500, new { error = "An error occurred while fixing costs for failed requests" });
+            }
+        }
+
+        // Direct fix for specific issues (Development only)
+        [HttpPost("debug/direct-fix")]
+        [ApiExplorerSettings(IgnoreApi = true)]
+        public async Task<ActionResult> DirectFixForErrors()
+        {
+            try
+            {
+                _logger.LogInformation("Running direct fix for error responses");
+
+                using var dbContext = _dbContext;
+
+                // Get all logs with error responses
+                var logsToFix = await dbContext.ChatUsageLogs
+                    .Where(l => l.Response.Contains("Error") || l.Response.Contains("error") || l.OutputTokenCount == 0)
+                    .ToListAsync();
+
+                _logger.LogInformation("Found {Count} logs with errors", logsToFix.Count);
+
+                foreach (var log in logsToFix)
+                {
+                    // Set success to false
+                    log.Success = false;
+
+                    // Set costs and tokens to 0
+                    log.EstimatedCost = 0;
+                    log.InputTokenCount = 0;
+                    log.OutputTokenCount = 0;
+
+                    _logger.LogInformation("Fixed log ID {LogId}", log.Id);
+                }
+
+                // Save changes
+                int updated = await dbContext.SaveChangesAsync();
+
+                return Ok(new {
+                    logsFound = logsToFix.Count,
+                    logsUpdated = updated
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error in direct fix");
+                return StatusCode(500, new { error = "An error occurred during direct fix" });
             }
         }
 #endif
