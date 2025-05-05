@@ -157,6 +157,24 @@ namespace MCPServer.API.Controllers
                 return StatusCode(500, new { error = "An error occurred while generating sample logs" });
             }
         }
+
+        // Utility endpoint to fix costs for failed requests (Development only)
+        [HttpPost("debug/fix-costs")]
+        [ApiExplorerSettings(IgnoreApi = true)]
+        public async Task<ActionResult> FixCostsForFailedRequests()
+        {
+            try
+            {
+                _logger.LogInformation("Running cost correction for failed requests");
+                var result = await _chatUsageService.FixCostsForFailedRequestsAsync();
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error fixing costs for failed requests");
+                return StatusCode(500, new { error = "An error occurred while fixing costs for failed requests" });
+            }
+        }
 #endif
     }
 }

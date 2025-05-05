@@ -125,21 +125,22 @@ namespace MCPServer.Core.Services
                     // Calculate estimated cost if model information is available
                     if (model != null)
                     {
-                        // Most models charge per 1K tokens
-                        decimal inputCostPer1K = model.CostPer1KInputTokens;
-                        decimal outputCostPer1K = model.CostPer1KOutputTokens;
-
                         // If the request was not successful, don't charge for any tokens (input or output)
                         if (!success)
                         {
                             _logger.LogInformation("Request was not successful, not charging for tokens");
+                            outputTokens = 0;
                             estimatedCost = 0;
                         }
                         else
                         {
                             // Only calculate costs for successful requests
+                            // Most models charge per 1K tokens
+                            decimal inputCostPer1K = model.CostPer1KInputTokens;
+                            decimal outputCostPer1K = model.CostPer1KOutputTokens;
+                            
                             estimatedCost = (inputTokens / 1000.0M) * inputCostPer1K +
-                                             (outputTokens / 1000.0M) * outputCostPer1K;
+                                           (outputTokens / 1000.0M) * outputCostPer1K;
                             
                             _logger.LogInformation("Calculated cost: ${EstimatedCost:F6} using model {ModelName}", estimatedCost, model?.Name);
                         }
@@ -215,7 +216,8 @@ namespace MCPServer.Core.Services
                             providerName = model?.Provider?.Name,
                             inputTokens,
                             outputTokens,
-                            estimatedCost
+                            // Ensure cost is 0 in metrics for failed requests
+                            estimatedCost = success ? estimatedCost : 0
                         })
                     };
 
@@ -327,7 +329,8 @@ namespace MCPServer.Core.Services
                             modelName = model?.Name,
                             inputTokens,
                             outputTokens,
-                            estimatedCost
+                            // Ensure cost is 0 in metrics for failed requests
+                            estimatedCost = success ? estimatedCost : 0
                         })
                     };
                     
@@ -428,7 +431,8 @@ namespace MCPServer.Core.Services
                     providerName = model?.Provider?.Name,
                     inputTokens,
                     outputTokens,
-                    estimatedCost
+                    // Ensure cost is 0 in metrics for failed requests
+                    estimatedCost = success ? estimatedCost : 0
                 });
                 
                 metricCmd.Parameters.AddWithValue("@metricType", "ChatTokensUsed");
@@ -689,6 +693,65 @@ namespace MCPServer.Core.Services
             };
         }
 
+        // Method to fix costs for failed requests in the database
+        public async Task<object> FixCostsForFailedRequestsAsync()
+        {
+            using var dbContext = await _dbContextFactory.CreateDbContextAsync();
+            
+            // 1. First, find all UsageMetrics entries with failed requests but non-zero costs
+            var metricsToUpdate = new List<UsageMetric>();
+            var metrics = await dbContext.UsageMetrics
+                .Where(m => m.MetricType == "ChatTokensUsed" && m.AdditionalData != null)
+                .ToListAsync();
+            
+            int updated = 0;
+            
+            foreach (var metric in metrics)
+            {
+                try
+                {
+                    // Parse the AdditionalData JSON
+                    var data = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(metric.AdditionalData);
+                    
+                    // Check if this represents a failed request based on outputTokens being 0
+                    if (data != null && 
+                        data.TryGetValue("outputTokens", out var outputTokensElement) &&
+                        outputTokensElement.TryGetInt32(out int outputTokens) &&
+                        outputTokens == 0)
+                    {
+                        // This is likely a failed request, check if it has a cost
+                        if (data.TryGetValue("estimatedCost", out var costElement) &&
+                            costElement.TryGetDecimal(out decimal cost) &&
+                            cost > 0)
+                        {
+                            // Update the AdditionalData to set estimatedCost to 0
+                            data["estimatedCost"] = JsonDocument.Parse("0").RootElement;
+                            metric.AdditionalData = JsonSerializer.Serialize(data);
+                            metricsToUpdate.Add(metric);
+                        }
+                    }
+                }
+                catch (JsonException)
+                {
+                    // Skip malformed JSON data
+                    continue;
+                }
+            }
+            
+            // Update the metrics in the database
+            if (metricsToUpdate.Count > 0)
+            {
+                updated = await dbContext.SaveChangesAsync();
+            }
+            
+            return new
+            {
+                totalMetricsChecked = metrics.Count,
+                metricsNeedingUpdate = metricsToUpdate.Count,
+                metricsUpdated = updated
+            };
+        }
+
         public async Task<object> GenerateSampleDataAsync(int count = 10)
         {
             using var dbContext = await _dbContextFactory.CreateDbContextAsync();
@@ -775,10 +838,13 @@ namespace MCPServer.Core.Services
                 int inputTokens = random.Next(100, 2000);
                 int outputTokens = isSuccessful ? random.Next(50, 1500) : 0;
                 
-                // Calculate estimated cost
-                decimal inputCost = (inputTokens / 1000.0M) * model.CostPer1KInputTokens;
-                decimal outputCost = (outputTokens / 1000.0M) * model.CostPer1KOutputTokens;
-                decimal totalCost = inputCost + outputCost;
+                // Calculate estimated cost - only for successful requests
+                decimal totalCost = 0;
+                if (isSuccessful) {
+                    decimal inputCost = (inputTokens / 1000.0M) * model.CostPer1KInputTokens;
+                    decimal outputCost = (outputTokens / 1000.0M) * model.CostPer1KOutputTokens;
+                    totalCost = inputCost + outputCost;
+                }
                 
                 var log = new ChatUsageLog
                 {

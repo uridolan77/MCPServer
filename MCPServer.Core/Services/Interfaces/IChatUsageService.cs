@@ -38,6 +38,8 @@ namespace MCPServer.Core.Services.Interfaces
 #if DEBUG
         Task<object> GetDiagnosticInfoAsync();
         
+        Task<object> FixCostsForFailedRequestsAsync();
+        
         Task<object> GenerateSampleDataAsync(int count = 10);
 #endif
     }
