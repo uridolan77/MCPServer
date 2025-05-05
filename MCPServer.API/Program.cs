@@ -12,6 +12,17 @@ using MCPServer.Core.Services;
 using MCPServer.Core.Services.Interfaces;
 using MCPServer.Core.Services.Llm;
 using MCPServer.Core.Services.Rag;
+using MCPServer.Core.Features.Auth.Services;
+using MCPServer.Core.Features.Auth.Services.Interfaces;
+using MCPServer.Core.Features.Shared.Services;
+using MCPServer.Core.Features.Shared.Services.Interfaces;
+using MCPServer.Core.Features.Chat.Services.Interfaces;
+using MCPServer.Core.Features.Llm.Services.Interfaces;
+using MCPServer.Core.Features.Models.Services.Interfaces;
+using MCPServer.Core.Features.Providers.Services.Interfaces;
+using MCPServer.Core.Features.Rag.Services.Interfaces;
+using MCPServer.Core.Features.Sessions.Services.Interfaces;
+using MCPServer.Core.Features.Usage.Services.Interfaces;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
@@ -53,7 +64,7 @@ builder.Services.AddSwaggerGen(options =>
     {
         Title = "MCP Server API v1",
         Version = "v1",
-        Description = "API for the MCP Server application. This API provides endpoints for managing LLM providers, models, and chat functionality.",
+        Description = "API for the MCP Server application. This API provides endpoints for managing LLM providers, models, and chat functionality. The API is organized by features: Auth, Chat, Llm, Rag, Usage, Models, Providers, and Sessions.",
         Contact = new Microsoft.OpenApi.Models.OpenApiContact
         {
             Name = "MCP Server Team",
@@ -214,15 +225,15 @@ builder.Services.AddAuthentication(options =>
 .AddScheme<AuthenticationSchemeOptions, TestAuthHandler>("Test", options => { });
 
 // Register HttpClient for LLM service
-builder.Services.AddHttpClient<ILlmService, LlmService>();
+builder.Services.AddHttpClient<MCPServer.Core.Features.Llm.Services.Interfaces.ILlmService, MCPServer.Core.Services.LlmService>();
 
 // Register LLM services and factories
 builder.Services.AddHttpClient("OpenAI");
 builder.Services.AddHttpClient("Anthropic");
 builder.Services.AddScoped<ILlmProviderFactory, OpenAiProviderFactory>();
 builder.Services.AddScoped<ILlmProviderFactory, AnthropicProviderFactory>();
-builder.Services.AddScoped<ILlmService, LlmService>();
-builder.Services.AddScoped<ILlmProviderService, LlmProviderService>();
+builder.Services.AddScoped<MCPServer.Core.Features.Llm.Services.Interfaces.ILlmService, MCPServer.Core.Services.LlmService>();
+builder.Services.AddScoped<MCPServer.Core.Features.Providers.Services.Interfaces.ILlmProviderService, MCPServer.Core.Services.LlmProviderService>();
 
 // Configure Entity Framework
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
@@ -237,27 +248,27 @@ builder.Services.AddDbContextFactory<McpServerDbContext>(options =>
 
 // Register other services
 // TokenManager needs to be scoped to work with other scoped services
-builder.Services.AddScoped<ITokenManager, TokenManager>();
+builder.Services.AddScoped<MCPServer.Core.Features.Auth.Services.Interfaces.ITokenManager, MCPServer.Core.Features.Auth.Services.TokenManager>();
 // Caching service is already registered
-builder.Services.AddScoped<IContextService, MySqlContextService>();
-builder.Services.AddScoped<IUserService, UserService>();
-builder.Services.AddScoped<ISessionService, SessionService>();
-builder.Services.AddScoped<IChatUsageService, ChatUsageService>();
-builder.Services.AddScoped<IModelService, ModelService>();
-builder.Services.AddScoped<IChatStreamingService, ChatStreamingService>();
+builder.Services.AddScoped<MCPServer.Core.Features.Sessions.Services.Interfaces.IContextService, MCPServer.Core.Services.MySqlContextService>();
+builder.Services.AddScoped<MCPServer.Core.Features.Auth.Services.Interfaces.IUserService, MCPServer.Core.Features.Auth.Services.UserService>();
+builder.Services.AddScoped<MCPServer.Core.Features.Sessions.Services.Interfaces.ISessionService, MCPServer.Core.Services.SessionService>();
+builder.Services.AddScoped<MCPServer.Core.Features.Usage.Services.Interfaces.IChatUsageService, MCPServer.Core.Services.ChatUsageService>();
+builder.Services.AddScoped<MCPServer.Core.Features.Models.Services.Interfaces.IModelService, MCPServer.Core.Services.ModelService>();
+builder.Services.AddScoped<MCPServer.Core.Features.Chat.Services.Interfaces.IChatStreamingService, MCPServer.Core.Services.ChatStreamingService>();
 // ChatPlaygroundService will be registered when needed
 
 // Register new services
-builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
-builder.Services.AddScoped<ISecurityService, SecurityService>();
-builder.Services.AddScoped<ICredentialService, CredentialService>();
+builder.Services.AddScoped<MCPServer.Core.Features.Shared.Services.Interfaces.IUnitOfWork, MCPServer.Core.Features.Shared.Services.UnitOfWork>();
+builder.Services.AddScoped<MCPServer.Core.Features.Shared.Services.Interfaces.ISecurityService, MCPServer.Core.Features.Shared.Services.SecurityService>();
+builder.Services.AddScoped<MCPServer.Core.Features.Auth.Services.Interfaces.ICredentialService, MCPServer.Core.Features.Auth.Services.CredentialService>();
 
 // Register repositories
-builder.Services.AddScoped<IRepository<LlmProvider>, Repository<LlmProvider>>();
-builder.Services.AddScoped<IRepository<LlmModel>, Repository<LlmModel>>();
-builder.Services.AddScoped<IRepository<Document>, Repository<Document>>();
-builder.Services.AddScoped<IRepository<Chunk>, Repository<Chunk>>();
-builder.Services.AddScoped<IRepository<ChatUsageLog>, Repository<ChatUsageLog>>();
+builder.Services.AddScoped<MCPServer.Core.Features.Shared.Services.Interfaces.IRepository<LlmProvider>, MCPServer.Core.Features.Shared.Services.Repository<LlmProvider>>();
+builder.Services.AddScoped<MCPServer.Core.Features.Shared.Services.Interfaces.IRepository<LlmModel>, MCPServer.Core.Features.Shared.Services.Repository<LlmModel>>();
+builder.Services.AddScoped<MCPServer.Core.Features.Shared.Services.Interfaces.IRepository<Document>, MCPServer.Core.Features.Shared.Services.Repository<Document>>();
+builder.Services.AddScoped<MCPServer.Core.Features.Shared.Services.Interfaces.IRepository<Chunk>, MCPServer.Core.Features.Shared.Services.Repository<Chunk>>();
+builder.Services.AddScoped<MCPServer.Core.Features.Shared.Services.Interfaces.IRepository<ChatUsageLog>, MCPServer.Core.Features.Shared.Services.Repository<ChatUsageLog>>();
 
 // Note: We'll use the UnitOfWork pattern to access repositories
 // The UnitOfWork will create the appropriate repository instances as needed
@@ -267,23 +278,23 @@ builder.Services.AddScoped<MCPServer.Core.Data.Repositories.ILlmProviderReposito
 builder.Services.AddScoped<MCPServer.Core.Data.Repositories.ILlmModelRepository, MCPServer.Core.Data.Repositories.LlmModelRepository>();
 
 // Register caching service
-builder.Services.AddScoped<MCPServer.Core.Services.Interfaces.ICachingService, MCPServer.API.Services.CachingService>();
+builder.Services.AddScoped<MCPServer.Core.Features.Shared.Services.Interfaces.ICachingService, MCPServer.API.Services.CachingService>();
 
 // Register UnitOfWork
-builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
+builder.Services.AddScoped<MCPServer.Core.Features.Shared.Services.Interfaces.IUnitOfWork, MCPServer.Core.Features.Shared.Services.UnitOfWork>();
 
 // Register logger factory for generic repositories
 // Note: ILogger<T> is automatically registered by the framework
 // The Repository<T> class uses non-generic ILogger, so we need to provide an implementation
 
 // Fix for Repository<T> constructor - create a non-generic ILogger that delegates to a generic one
-builder.Services.AddTransient<ILogger>(provider => provider.GetRequiredService<ILogger<Repository<object>>>());
+builder.Services.AddTransient<ILogger>(provider => provider.GetRequiredService<ILogger<MCPServer.Core.Features.Shared.Services.Repository<object>>>());
 
 // Register RAG services
-builder.Services.AddHttpClient<IEmbeddingService, EmbeddingService>();
-builder.Services.AddScoped<IDocumentService, MySqlDocumentService>();
-builder.Services.AddScoped<IVectorDbService, MySqlVectorDbService>();
-builder.Services.AddScoped<IRagService, RagService>();
+builder.Services.AddHttpClient<MCPServer.Core.Features.Rag.Services.Interfaces.IEmbeddingService, MCPServer.Core.Services.Rag.EmbeddingService>();
+builder.Services.AddScoped<MCPServer.Core.Features.Rag.Services.Interfaces.IDocumentService, MCPServer.Core.Services.Rag.MySqlDocumentService>();
+builder.Services.AddScoped<MCPServer.Core.Features.Rag.Services.Interfaces.IVectorDbService, MCPServer.Core.Services.Rag.MySqlVectorDbService>();
+builder.Services.AddScoped<MCPServer.Core.Features.Rag.Services.Interfaces.IRagService, MCPServer.Core.Services.Rag.RagService>();
 
 // Register database initializer and seeders
 builder.Services.AddScoped<MCPServer.Core.Services.DatabaseInitializer>();

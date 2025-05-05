@@ -170,7 +170,7 @@ export const chatPlaygroundApi = {
 
       // Try alternative endpoints if the main one fails
       const alternativeEndpoints = [
-        '/chat-playground/models',
+        '/chat/models',
         '/llm/models',
         '/models'
       ];
@@ -286,7 +286,7 @@ export const chatPlaygroundApi = {
       // Create EventSource for server-sent events
       // Use a relative URL to work properly with the Vite proxy configuration
       const streamEndpoint = '/api/chat/stream';
-      
+
       console.log(`Creating EventSource with URL: ${streamEndpoint}`);
 
       const eventSource = new EventSource(

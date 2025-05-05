@@ -49,9 +49,9 @@ const ChatPlaygroundPage: React.FC = () => {
   const [lastRefreshTime, setLastRefreshTime] = useState<Date>(new Date());
 
   // Fetch available models
-  const { 
-    data: modelsData, 
-    isLoading: modelsLoading, 
+  const {
+    data: modelsData,
+    isLoading: modelsLoading,
     error: modelsError,
     refetch: refetchModels
   } = useQuery<LlmModel[]>({
@@ -139,7 +139,7 @@ const ChatPlaygroundPage: React.FC = () => {
           (data) => {
             // Log received chunk for debugging
             console.log('Received chunk:', data.chunk.length, 'chars:', data.chunk.substring(0, 20) + '...');
-            
+
             if (!responseAdded) {
               // Add an empty assistant message that we'll update
               setMessages((prev) => [...prev, { role: 'assistant', content: '' }]);
@@ -242,9 +242,9 @@ const ChatPlaygroundPage: React.FC = () => {
         console.error('Error parsing LLM models response:', err);
       }
 
-      // Try to fetch models from chat playground endpoint
-      console.log('Fetching models from /chat-playground/models endpoint...');
-      const chatModelsResponse = await fetch('http://localhost:2000/api/chat-playground/models', {
+      // Try to fetch models from chat endpoint
+      console.log('Fetching models from /chat/models endpoint...');
+      const chatModelsResponse = await fetch('http://localhost:2000/api/chat/models', {
         headers: {
           'Authorization': token ? `Bearer ${token}` : '',
         }
@@ -301,13 +301,13 @@ const ChatPlaygroundPage: React.FC = () => {
   const renderModelLoadError = () => {
     if (modelsError) {
       return (
-        <Alert 
-          severity="error" 
+        <Alert
+          severity="error"
           sx={{ mb: 2 }}
           action={
-            <Button 
-              color="inherit" 
-              size="small" 
+            <Button
+              color="inherit"
+              size="small"
               onClick={handleRefreshModels}
               startIcon={<RefreshIcon />}
             >
