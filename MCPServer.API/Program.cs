@@ -285,6 +285,9 @@ builder.Services.AddScoped<MCPServer.Core.Features.Shared.Services.Interfaces.IC
 builder.Services.AddScoped<MCPServer.Core.Services.DatabaseInitializer>();
 builder.Services.AddScoped<MCPServer.Core.Data.LlmProviderSeeder>();
 
+// Register DataTransferService
+builder.Services.AddScoped<MCPServer.Core.Services.DataTransfer.DataTransferService>();
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.

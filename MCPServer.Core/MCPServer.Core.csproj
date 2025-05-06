@@ -33,6 +33,7 @@
     <PackageReference Include="StackExchange.Redis" Version="2.8.31" />
     <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.9.0" />
     <PackageReference Include="TiktokenSharp" Version="1.1.7" />
+    <PackageReference Include="System.Data.SqlClient" Version="4.8.6" />
   </ItemGroup>
 
   <!-- Force all EF Core packages to use version 9.0.4 -->

@@ -22,6 +22,7 @@ const UsageStatsPage = lazy(() => import('@/pages/usage/UsageStatsPage'));
 const UsersListPage = lazy(() => import('@/pages/users/UsersListPage'));
 const UserDetailsPage = lazy(() => import('@/pages/users/UserDetailsPage'));
 const ChatPlaygroundPage = lazy(() => import('@/pages/playground/ChatPlaygroundPage'));
+const DataTransferPage = lazy(() => import('@/pages/transfer/DataTransferPage'));
 // const ProfilePage = lazy(() => import('@/pages/profile/ProfilePage'));
 // const NotFoundPage = lazy(() => import('@/pages/errors/NotFoundPage'));
 // const UnauthorizedPage = lazy(() => import('@/pages/errors/UnauthorizedPage'));
@@ -88,6 +89,9 @@ export const AppRoutes: React.FC = () => {
 
           {/* Usage routes */}
           <Route path="/usage" element={<UsageStatsPage />} />
+
+          {/* Data Transfer routes */}
+          <Route path="/data-transfer" element={<DataTransferPage />} />
 
           {/* Chat Playground */}
           <Route path="/playground" element={<ChatPlaygroundPage />} />

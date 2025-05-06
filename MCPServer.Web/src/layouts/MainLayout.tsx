@@ -37,6 +37,7 @@ import Brightness7Icon from '@mui/icons-material/Brightness7';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import LogoutIcon from '@mui/icons-material/Logout';
 import RefreshIcon from '@mui/icons-material/Refresh';
+import SyncIcon from '@mui/icons-material/Sync';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -59,6 +60,7 @@ const navItems: NavItem[] = [
   { text: 'RAG Documents', path: '/documents', icon: <DescriptionIcon /> },
   { text: 'Chat Playground', path: '/playground', icon: <ChatIcon /> },
   { text: 'Usage Stats', path: '/usage', icon: <BarChartIcon /> },
+  { text: 'Data Transfer', path: '/data-transfer', icon: <SyncIcon /> },
   { text: 'Users', path: '/users', icon: <PeopleIcon />, requiredRoles: ['Admin'] }
 ];
 
