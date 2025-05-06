@@ -1,0 +1,1308 @@
+{
+  "metadata": {
+    "id": "database-meta-schema-v1",
+    "version": "1.0.0",
+    "name": "Database Meta-Schema",
+    "description": "A comprehensive meta-schema for storing database structural definitions",
+    "created": "2025-05-06T12:00:00Z",
+    "modified": "2025-05-06T12:00:00Z"
+  },
+  "entities": [
+    {
+      "name": "Database",
+      "description": "Represents a database instance",
+      "properties": [
+        {
+          "name": "id",
+          "type": "string",
+          "description": "Unique identifier for the database",
+          "required": true
+        },
+        {
+          "name": "name",
+          "type": "string",
+          "description": "Name of the database",
+          "required": true
+        },
+        {
+          "name": "description",
+          "type": "string",
+          "description": "Description of the database purpose"
+        },
+        {
+          "name": "vendor",
+          "type": "string",
+          "description": "Database vendor (SQL Server, Oracle, MySQL, etc.)"
+        },
+        {
+          "name": "version",
+          "type": "string",
+          "description": "Database version"
+        },
+        {
+          "name": "created",
+          "type": "datetime",
+          "description": "When the database was created"
+        },
+        {
+          "name": "lastModified",
+          "type": "datetime",
+          "description": "When the database was last modified"
+        },
+        {
+          "name": "collation",
+          "type": "string",
+          "description": "Default collation of the database"
+        },
+        {
+          "name": "characterSet",
+          "type": "string",
+          "description": "Default character set of the database"
+        }
+      ]
+    },
+    {
+      "name": "Schema",
+      "description": "Represents a schema within a database",
+      "properties": [
+        {
+          "name": "id",
+          "type": "string",
+          "description": "Unique identifier for the schema",
+          "required": true
+        },
+        {
+          "name": "databaseId",
+          "type": "string",
+          "description": "Reference to the parent database",
+          "required": true
+        },
+        {
+          "name": "name",
+          "type": "string",
+          "description": "Name of the schema",
+          "required": true
+        },
+        {
+          "name": "description",
+          "type": "string",
+          "description": "Description of the schema purpose"
+        },
+        {
+          "name": "owner",
+          "type": "string",
+          "description": "Owner of the schema"
+        },
+        {
+          "name": "created",
+          "type": "datetime",
+          "description": "When the schema was created"
+        },
+        {
+          "name": "lastModified",
+          "type": "datetime",
+          "description": "When the schema was last modified"
+        }
+      ]
+    },
+    {
+      "name": "Table",
+      "description": "Represents a table in a database schema",
+      "properties": [
+        {
+          "name": "id",
+          "type": "string",
+          "description": "Unique identifier for the table",
+          "required": true
+        },
+        {
+          "name": "schemaId",
+          "type": "string",
+          "description": "Reference to the parent schema",
+          "required": true
+        },
+        {
+          "name": "name",
+          "type": "string",
+          "description": "Name of the table",
+          "required": true
+        },
+        {
+          "name": "description",
+          "type": "string",
+          "description": "Description of the table purpose"
+        },
+        {
+          "name": "type",
+          "type": "string",
+          "description": "Type of table (regular, temporary, view, etc.)",
+          "defaultValue": "regular"
+        },
+        {
+          "name": "created",
+          "type": "datetime",
+          "description": "When the table was created"
+        },
+        {
+          "name": "lastModified",
+          "type": "datetime",
+          "description": "When the table was last modified"
+        },
+        {
+          "name": "isSystem",
+          "type": "boolean",
+          "description": "Whether the table is a system table",
+          "defaultValue": false
+        },
+        {
+          "name": "estimatedRows",
+          "type": "integer",
+          "description": "Estimated number of rows in the table"
+        },
+        {
+          "name": "storageEngine",
+          "type": "string",
+          "description": "Storage engine used by the table (e.g., InnoDB, MyISAM)"
+        },
+        {
+          "name": "tableSpace",
+          "type": "string",
+          "description": "Tablespace where the table is stored"
+        },
+        {
+          "name": "fileGroup",
+          "type": "string",
+          "description": "File group where the table is stored (SQL Server specific)"
+        },
+        {
+          "name": "partitioned",
+          "type": "boolean",
+          "description": "Whether the table is partitioned",
+          "defaultValue": false
+        },
+        {
+          "name": "partitionInfo",
+          "type": "object",
+          "description": "Information about table partitioning"
+        }
+      ]
+    },
+    {
+      "name": "Column",
+      "description": "Represents a column in a database table",
+      "properties": [
+        {
+          "name": "id",
+          "type": "string",
+          "description": "Unique identifier for the column",
+          "required": true
+        },
+        {
+          "name": "tableId",
+          "type": "string",
+          "description": "Reference to the parent table",
+          "required": true
+        },
+        {
+          "name": "name",
+          "type": "string",
+          "description": "Name of the column",
+          "required": true
+        },
+        {
+          "name": "description",
+          "type": "string",
+          "description": "Description of the column"
+        },
+        {
+          "name": "ordinalPosition",
+          "type": "integer",
+          "description": "Position of the column in the table",
+          "required": true
+        },
+        {
+          "name": "dataType",
+          "type": "string",
+          "description": "Data type of the column",
+          "required": true
+        },
+        {
+          "name": "precision",
+          "type": "integer",
+          "description": "Precision for numeric data types"
+        },
+        {
+          "name": "scale",
+          "type": "integer",
+          "description": "Scale for numeric data types"
+        },
+        {
+          "name": "maxLength",
+          "type": "integer",
+          "description": "Maximum length for string data types"
+        },
+        {
+          "name": "isNullable",
+          "type": "boolean",
+          "description": "Whether the column can contain NULL values",
+          "defaultValue": true
+        },
+        {
+          "name": "defaultValue",
+          "type": "string",
+          "description": "Default value for the column"
+        },
+        {
+          "name": "defaultConstraintName",
+          "type": "string",
+          "description": "Name of the default constraint"
+        },
+        {
+          "name": "isIdentity",
+          "type": "boolean",
+          "description": "Whether the column is an identity/auto-increment column",
+          "defaultValue": false
+        },
+        {
+          "name": "identitySeed",
+          "type": "integer",
+          "description": "Seed value for identity columns"
+        },
+        {
+          "name": "identityIncrement",
+          "type": "integer",
+          "description": "Increment value for identity columns"
+        },
+        {
+          "name": "isComputed",
+          "type": "boolean",
+          "description": "Whether the column is computed",
+          "defaultValue": false
+        },
+        {
+          "name": "computedExpression",
+          "type": "string",
+          "description": "Expression for computed columns"
+        },
+        {
+          "name": "isPersisted",
+          "type": "boolean",
+          "description": "Whether a computed column is persisted",
+          "defaultValue": false
+        },
+        {
+          "name": "collation",
+          "type": "string",
+          "description": "Collation for character data types"
+        },
+        {
+          "name": "isHidden",
+          "type": "boolean",
+          "description": "Whether the column is hidden",
+          "defaultValue": false
+        },
+        {
+          "name": "isSparse",
+          "type": "boolean",
+          "description": "Whether the column is sparse",
+          "defaultValue": false
+        },
+        {
+          "name": "isRowGuid",
+          "type": "boolean",
+          "description": "Whether the column is a row GUID",
+          "defaultValue": false
+        },
+        {
+          "name": "isFileStream",
+          "type": "boolean",
+          "description": "Whether the column is a filestream",
+          "defaultValue": false
+        }
+      ]
+    },
+    {
+      "name": "PrimaryKey",
+      "description": "Represents a primary key constraint",
+      "properties": [
+        {
+          "name": "id",
+          "type": "string",
+          "description": "Unique identifier for the primary key",
+          "required": true
+        },
+        {
+          "name": "tableId",
+          "type": "string",
+          "description": "Reference to the parent table",
+          "required": true
+        },
+        {
+          "name": "name",
+          "type": "string",
+          "description": "Name of the primary key constraint",
+          "required": true
+        },
+        {
+          "name": "columns",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "columnId": {
+                "type": "string",
+                "description": "Reference to the column"
+              },
+              "order": {
+                "type": "integer",
+                "description": "Order of the column in the primary key"
+              },
+              "direction": {
+                "type": "string",
+                "description": "Sort direction (ASC, DESC)",
+                "enum": ["ASC", "DESC"],
+                "defaultValue": "ASC"
+              }
+            }
+          },
+          "description": "Columns that make up the primary key",
+          "required": true
+        },
+        {
+          "name": "isClustered",
+          "type": "boolean",
+          "description": "Whether the primary key is clustered",
+          "defaultValue": true
+        },
+        {
+          "name": "fillFactor",
+          "type": "integer",
+          "description": "Fill factor for the primary key index"
+        },
+        {
+          "name": "padIndex",
+          "type": "boolean",
+          "description": "Whether to pad the index",
+          "defaultValue": false
+        },
+        {
+          "name": "ignoreDuplicateKey",
+          "type": "boolean",
+          "description": "Whether to ignore duplicate keys",
+          "defaultValue": false
+        },
+        {
+          "name": "allowRowLocks",
+          "type": "boolean",
+          "description": "Whether to allow row locks",
+          "defaultValue": true
+        },
+        {
+          "name": "allowPageLocks",
+          "type": "boolean",
+          "description": "Whether to allow page locks",
+          "defaultValue": true
+        }
+      ]
+    },
+    {
+      "name": "ForeignKey",
+      "description": "Represents a foreign key constraint",
+      "properties": [
+        {
+          "name": "id",
+          "type": "string",
+          "description": "Unique identifier for the foreign key",
+          "required": true
+        },
+        {
+          "name": "name",
+          "type": "string",
+          "description": "Name of the foreign key constraint",
+          "required": true
+        },
+        {
+          "name": "tableId",
+          "type": "string",
+          "description": "Reference to the child table",
+          "required": true
+        },
+        {
+          "name": "referencedTableId",
+          "type": "string",
+          "description": "Reference to the parent table",
+          "required": true
+        },
+        {
+          "name": "columnMappings",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "columnId": {
+                "type": "string",
+                "description": "Reference to the child column"
+              },
+              "referencedColumnId": {
+                "type": "string",
+                "description": "Reference to the parent column"
+              }
+            }
+          },
+          "description": "Mapping between child and parent columns",
+          "required": true
+        },
+        {
+          "name": "updateRule",
+          "type": "string",
+          "description": "Action to take on update",
+          "enum": ["NO ACTION", "CASCADE", "SET NULL", "SET DEFAULT", "RESTRICT"],
+          "defaultValue": "NO ACTION"
+        },
+        {
+          "name": "deleteRule",
+          "type": "string",
+          "description": "Action to take on delete",
+          "enum": ["NO ACTION", "CASCADE", "SET NULL", "SET DEFAULT", "RESTRICT"],
+          "defaultValue": "NO ACTION"
+        },
+        {
+          "name": "isEnabled",
+          "type": "boolean",
+          "description": "Whether the foreign key is enabled",
+          "defaultValue": true
+        },
+        {
+          "name": "isNotForReplication",
+          "type": "boolean",
+          "description": "Whether the foreign key is not for replication",
+          "defaultValue": false
+        }
+      ]
+    },
+    {
+      "name": "Index",
+      "description": "Represents an index on a table",
+      "properties": [
+        {
+          "name": "id",
+          "type": "string",
+          "description": "Unique identifier for the index",
+          "required": true
+        },
+        {
+          "name": "tableId",
+          "type": "string",
+          "description": "Reference to the parent table",
+          "required": true
+        },
+        {
+          "name": "name",
+          "type": "string",
+          "description": "Name of the index",
+          "required": true
+        },
+        {
+          "name": "description",
+          "type": "string",
+          "description": "Description of the index"
+        },
+        {
+          "name": "isUnique",
+          "type": "boolean",
+          "description": "Whether the index is unique",
+          "defaultValue": false
+        },
+        {
+          "name": "isClustered",
+          "type": "boolean",
+          "description": "Whether the index is clustered",
+          "defaultValue": false
+        },
+        {
+          "name": "type",
+          "type": "string",
+          "description": "Type of index (BTREE, HASH, etc.)",
+          "defaultValue": "BTREE"
+        },
+        {
+          "name": "columns",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "columnId": {
+                "type": "string",
+                "description": "Reference to the column"
+              },
+              "order": {
+                "type": "integer",
+                "description": "Order of the column in the index"
+              },
+              "direction": {
+                "type": "string",
+                "description": "Sort direction (ASC, DESC)",
+                "enum": ["ASC", "DESC"],
+                "defaultValue": "ASC"
+              },
+              "isIncluded": {
+                "type": "boolean",
+                "description": "Whether the column is included but not indexed",
+                "defaultValue": false
+              }
+            }
+          },
+          "description": "Columns that make up the index",
+          "required": true
+        },
+        {
+          "name": "filterPredicate",
+          "type": "string",
+          "description": "Filter predicate for filtered indexes"
+        },
+        {
+          "name": "fillFactor",
+          "type": "integer",
+          "description": "Fill factor for the index"
+        },
+        {
+          "name": "padIndex",
+          "type": "boolean",
+          "description": "Whether to pad the index",
+          "defaultValue": false
+        },
+        {
+          "name": "ignoreDuplicateKey",
+          "type": "boolean",
+          "description": "Whether to ignore duplicate keys",
+          "defaultValue": false
+        },
+        {
+          "name": "allowRowLocks",
+          "type": "boolean",
+          "description": "Whether to allow row locks",
+          "defaultValue": true
+        },
+        {
+          "name": "allowPageLocks",
+          "type": "boolean",
+          "description": "Whether to allow page locks",
+          "defaultValue": true
+        },
+        {
+          "name": "isDisabled",
+          "type": "boolean",
+          "description": "Whether the index is disabled",
+          "defaultValue": false
+        }
+      ]
+    },
+    {
+      "name": "CheckConstraint",
+      "description": "Represents a check constraint on a table",
+      "properties": [
+        {
+          "name": "id",
+          "type": "string",
+          "description": "Unique identifier for the check constraint",
+          "required": true
+        },
+        {
+          "name": "tableId",
+          "type": "string",
+          "description": "Reference to the parent table",
+          "required": true
+        },
+        {
+          "name": "name",
+          "type": "string",
+          "description": "Name of the check constraint",
+          "required": true
+        },
+        {
+          "name": "description",
+          "type": "string",
+          "description": "Description of the check constraint"
+        },
+        {
+          "name": "definition",
+          "type": "string",
+          "description": "SQL definition of the check constraint",
+          "required": true
+        },
+        {
+          "name": "isEnabled",
+          "type": "boolean",
+          "description": "Whether the check constraint is enabled",
+          "defaultValue": true
+        },
+        {
+          "name": "isNotForReplication",
+          "type": "boolean",
+          "description": "Whether the constraint is not for replication",
+          "defaultValue": false
+        }
+      ]
+    },
+    {
+      "name": "UniqueConstraint",
+      "description": "Represents a unique constraint on a table",
+      "properties": [
+        {
+          "name": "id",
+          "type": "string",
+          "description": "Unique identifier for the unique constraint",
+          "required": true
+        },
+        {
+          "name": "tableId",
+          "type": "string",
+          "description": "Reference to the parent table",
+          "required": true
+        },
+        {
+          "name": "name",
+          "type": "string",
+          "description": "Name of the unique constraint",
+          "required": true
+        },
+        {
+          "name": "description",
+          "type": "string",
+          "description": "Description of the unique constraint"
+        },
+        {
+          "name": "columns",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "columnId": {
+                "type": "string",
+                "description": "Reference to the column"
+              },
+              "order": {
+                "type": "integer",
+                "description": "Order of the column in the constraint"
+              }
+            }
+          },
+          "description": "Columns that make up the unique constraint",
+          "required": true
+        },
+        {
+          "name": "isClustered",
+          "type": "boolean",
+          "description": "Whether the constraint has a clustered index",
+          "defaultValue": false
+        }
+      ]
+    },
+    {
+      "name": "View",
+      "description": "Represents a view in a database schema",
+      "properties": [
+        {
+          "name": "id",
+          "type": "string",
+          "description": "Unique identifier for the view",
+          "required": true
+        },
+        {
+          "name": "schemaId",
+          "type": "string",
+          "description": "Reference to the parent schema",
+          "required": true
+        },
+        {
+          "name": "name",
+          "type": "string",
+          "description": "Name of the view",
+          "required": true
+        },
+        {
+          "name": "description",
+          "type": "string",
+          "description": "Description of the view purpose"
+        },
+        {
+          "name": "definition",
+          "type": "string",
+          "description": "SQL definition of the view",
+          "required": true
+        },
+        {
+          "name": "isIndexed",
+          "type": "boolean",
+          "description": "Whether the view is indexed",
+          "defaultValue": false
+        },
+        {
+          "name": "isMaterialized",
+          "type": "boolean",
+          "description": "Whether the view is materialized",
+          "defaultValue": false
+        },
+        {
+          "name": "isUpdatable",
+          "type": "boolean",
+          "description": "Whether the view is updatable",
+          "defaultValue": false
+        },
+        {
+          "name": "created",
+          "type": "datetime",
+          "description": "When the view was created"
+        },
+        {
+          "name": "lastModified",
+          "type": "datetime",
+          "description": "When the view was last modified"
+        }
+      ]
+    },
+    {
+      "name": "StoredProcedure",
+      "description": "Represents a stored procedure in a database schema",
+      "properties": [
+        {
+          "name": "id",
+          "type": "string",
+          "description": "Unique identifier for the stored procedure",
+          "required": true
+        },
+        {
+          "name": "schemaId",
+          "type": "string",
+          "description": "Reference to the parent schema",
+          "required": true
+        },
+        {
+          "name": "name",
+          "type": "string",
+          "description": "Name of the stored procedure",
+          "required": true
+        },
+        {
+          "name": "description",
+          "type": "string",
+          "description": "Description of the stored procedure purpose"
+        },
+        {
+          "name": "definition",
+          "type": "string",
+          "description": "SQL definition of the stored procedure",
+          "required": true
+        },
+        {
+          "name": "parameters",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Name of the parameter"
+              },
+              "dataType": {
+                "type": "string",
+                "description": "Data type of the parameter"
+              },
+              "direction": {
+                "type": "string",
+                "description": "Direction of the parameter (IN, OUT, INOUT)",
+                "enum": ["IN", "OUT", "INOUT"]
+              },
+              "defaultValue": {
+                "type": "string",
+                "description": "Default value of the parameter"
+              },
+              "isNullable": {
+                "type": "boolean",
+                "description": "Whether the parameter can be NULL"
+              }
+            }
+          },
+          "description": "Parameters of the stored procedure"
+        },
+        {
+          "name": "created",
+          "type": "datetime",
+          "description": "When the stored procedure was created"
+        },
+        {
+          "name": "lastModified",
+          "type": "datetime",
+          "description": "When the stored procedure was last modified"
+        }
+      ]
+    },
+    {
+      "name": "Function",
+      "description": "Represents a function in a database schema",
+      "properties": [
+        {
+          "name": "id",
+          "type": "string",
+          "description": "Unique identifier for the function",
+          "required": true
+        },
+        {
+          "name": "schemaId",
+          "type": "string",
+          "description": "Reference to the parent schema",
+          "required": true
+        },
+        {
+          "name": "name",
+          "type": "string",
+          "description": "Name of the function",
+          "required": true
+        },
+        {
+          "name": "description",
+          "type": "string",
+          "description": "Description of the function purpose"
+        },
+        {
+          "name": "definition",
+          "type": "string",
+          "description": "SQL definition of the function",
+          "required": true
+        },
+        {
+          "name": "returnType",
+          "type": "string",
+          "description": "Return type of the function",
+          "required": true
+        },
+        {
+          "name": "functionType",
+          "type": "string",
+          "description": "Type of function (scalar, table-valued, aggregate)",
+          "enum": ["SCALAR", "TABLE", "AGGREGATE"],
+          "required": true
+        },
+        {
+          "name": "parameters",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Name of the parameter"
+              },
+              "dataType": {
+                "type": "string",
+                "description": "Data type of the parameter"
+              },
+              "defaultValue": {
+                "type": "string",
+                "description": "Default value of the parameter"
+              },
+              "isNullable": {
+                "type": "boolean",
+                "description": "Whether the parameter can be NULL"
+              }
+            }
+          },
+          "description": "Parameters of the function"
+        },
+        {
+          "name": "isDeterministic",
+          "type": "boolean",
+          "description": "Whether the function is deterministic",
+          "defaultValue": false
+        },
+        {
+          "name": "created",
+          "type": "datetime",
+          "description": "When the function was created"
+        },
+        {
+          "name": "lastModified",
+          "type": "datetime",
+          "description": "When the function was last modified"
+        }
+      ]
+    },
+    {
+      "name": "Trigger",
+      "description": "Represents a trigger in a database schema",
+      "properties": [
+        {
+          "name": "id",
+          "type": "string",
+          "description": "Unique identifier for the trigger",
+          "required": true
+        },
+        {
+          "name": "tableId",
+          "type": "string",
+          "description": "Reference to the parent table",
+          "required": true
+        },
+        {
+          "name": "name",
+          "type": "string",
+          "description": "Name of the trigger",
+          "required": true
+        },
+        {
+          "name": "description",
+          "type": "string",
+          "description": "Description of the trigger purpose"
+        },
+        {
+          "name": "definition",
+          "type": "string",
+          "description": "SQL definition of the trigger",
+          "required": true
+        },
+        {
+          "name": "event",
+          "type": "string",
+          "description": "Event that activates the trigger (INSERT, UPDATE, DELETE)",
+          "enum": ["INSERT", "UPDATE", "DELETE", "INSERT,UPDATE", "INSERT,DELETE", "UPDATE,DELETE", "INSERT,UPDATE,DELETE"],
+          "required": true
+        },
+        {
+          "name": "timing",
+          "type": "string",
+          "description": "When the trigger fires (BEFORE, AFTER, INSTEAD OF)",
+          "enum": ["BEFORE", "AFTER", "INSTEAD OF"],
+          "required": true
+        },
+        {
+          "name": "isEnabled",
+          "type": "boolean",
+          "description": "Whether the trigger is enabled",
+          "defaultValue": true
+        },
+        {
+          "name": "created",
+          "type": "datetime",
+          "description": "When the trigger was created"
+        },
+        {
+          "name": "lastModified",
+          "type": "datetime",
+          "description": "When the trigger was last modified"
+        }
+      ]
+    },
+    {
+      "name": "Sequence",
+      "description": "Represents a sequence in a database schema",
+      "properties": [
+        {
+          "name": "id",
+          "type": "string",
+          "description": "Unique identifier for the sequence",
+          "required": true
+        },
+        {
+          "name": "schemaId",
+          "type": "string",
+          "description": "Reference to the parent schema",
+          "required": true
+        },
+        {
+          "name": "name",
+          "type": "string",
+          "description": "Name of the sequence",
+          "required": true
+        },
+        {
+          "name": "description",
+          "type": "string",
+          "description": "Description of the sequence purpose"
+        },
+        {
+          "name": "dataType",
+          "type": "string",
+          "description": "Data type of the sequence",
+          "required": true
+        },
+        {
+          "name": "startValue",
+          "type": "integer",
+          "description": "Starting value of the sequence",
+          "required": true
+        },
+        {
+          "name": "increment",
+          "type": "integer",
+          "description": "Increment value of the sequence",
+          "required": true
+        },
+        {
+          "name": "minimumValue",
+          "type": "integer",
+          "description": "Minimum value of the sequence"
+        },
+        {
+          "name": "maximumValue",
+          "type": "integer",
+          "description": "Maximum value of the sequence"
+        },
+        {
+          "name": "isCycling",
+          "type": "boolean",
+          "description": "Whether the sequence cycles when it reaches its limit",
+          "defaultValue": false
+        },
+        {
+          "name": "cache",
+          "type": "integer",
+          "description": "Number of sequence values to cache"
+        },
+        {
+          "name": "created",
+          "type": "datetime",
+          "description": "When the sequence was created"
+        },
+        {
+          "name": "lastModified",
+          "type": "datetime",
+          "description": "When the sequence was last modified"
+        }
+      ]
+    },
+    {
+      "name": "DataType",
+      "description": "Represents a data type in the database",
+      "properties": [
+        {
+          "name": "id",
+          "type": "string",
+          "description": "Unique identifier for the data type",
+          "required": true
+        },
+        {
+          "name": "schemaId",
+          "type": "string",
+          "description": "Reference to the parent schema",
+          "required": true
+        },
+        {
+          "name": "name",
+          "type": "string",
+          "description": "Name of the data type",
+          "required": true
+        },
+        {
+          "name": "description",
+          "type": "string",
+          "description": "Description of the data type"
+        },
+        {
+          "name": "systemType",
+          "type": "string",
+          "description": "Base system type of the user-defined type"
+        },
+        {
+          "name": "precision",
+          "type": "integer",
+          "description": "Precision for numeric types"
+        },
+        {
+          "name": "scale",
+          "type": "integer",
+          "description": "Scale for numeric types"
+        },
+        {
+          "name": "maxLength",
+          "type": "integer",
+          "description": "Maximum length for string types"
+        },
+        {
+          "name": "isUserDefined",
+          "type": "boolean",
+          "description": "Whether the data type is user-defined",
+          "defaultValue": false
+        },
+        {
+          "name": "isTableType",
+          "type": "boolean",
+          "description": "Whether the data type is a table type",
+          "defaultValue": false
+        },
+        {
+          "name": "columns",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Name of the column in the table type"
+              },
+              "dataType": {
+                "type": "string",
+                "description": "Data type of the column"
+              },
+              "ordinalPosition": {
+                "type": "integer",
+                "description": "Position of the column in the table"
+              },
+              "isNullable": {
+                "type": "boolean",
+                "description": "Whether the column can be NULL"
+              }
+            }
+          },
+          "description": "Columns for table types"
+        },
+        {
+          "name": "created",
+          "type": "datetime",
+          "description": "When the data type was created"
+        },
+        {
+          "name": "lastModified",
+          "type": "datetime",
+          "description": "When the data type was last modified"
+        }
+      ]
+    }
+  ],
+  "relationships": [
+    {
+      "name": "DatabaseToSchema",
+      "description": "Relationship between a database and its schemas",
+      "source": "Database",
+      "target": "Schema",
+      "cardinality": "one-to-many",
+      "sourceProperty": "id",
+      "targetProperty": "databaseId"
+    },
+    {
+      "name": "SchemaToTable",
+      "description": "Relationship between a schema and its tables",
+      "source": "Schema",
+      "target": "Table",
+      "cardinality": "one-to-many",
+      "sourceProperty": "id",
+      "targetProperty": "schemaId"
+    },
+    {
+      "name": "TableToColumn",
+      "description": "Relationship between a table and its columns",
+      "source": "Table",
+      "target": "Column",
+      "cardinality": "one-to-many",
+      "sourceProperty": "id",
+      "targetProperty": "tableId"
+    },
+    {
+      "name": "TableToPrimaryKey",
+      "description": "Relationship between a table and its primary key",
+      "source": "Table",
+      "target": "PrimaryKey",
+      "cardinality": "one-to-one",
+      "sourceProperty": "id",
+      "targetProperty": "tableId"
+    },
+    {
+      "name": "TableToForeignKey",
+      "description": "Relationship between a table and its foreign keys",
+      "source": "Table",
+      "target": "ForeignKey",
+      "cardinality": "one-to-many",
+      "sourceProperty": "id",
+      "targetProperty": "tableId"
+    },
+    {
+      "name": "TableToIndex",
+      "description": "Relationship between a table and its indexes",
+      "source": "Table",
+      "target": "Index",
+      "cardinality": "one-to-many",
+      "sourceProperty": "id",
+      "targetProperty": "tableId"
+    },
+    {
+      "name": "TableToCheckConstraint",
+      "description": "Relationship between a table and its check constraints",
+      "source": "Table",
+      "target": "CheckConstraint",
+      "cardinality": "one-to-many",
+      "sourceProperty": "id",
+      "targetProperty": "tableId"
+    },
+    {
+      "name": "TableToUniqueConstraint",
+      "description": "Relationship between a table and its unique constraints",
+      "source": "Table",
+      "target": "UniqueConstraint",
+      "cardinality": "one-to-many",
+      "sourceProperty": "id",
+      "targetProperty": "tableId"
+    },
+    {
+      "name": "SchemaToView",
+      "description": "Relationship between a schema and its views",
+      "source": "Schema",
+      "target": "View",
+      "cardinality": "one-to-many",
+      "sourceProperty": "id",
+      "targetProperty": "schemaId"
+    },
+    {
+      "name": "SchemaToStoredProcedure",
+      "description": "Relationship between a schema and its stored procedures",
+      "source": "Schema",
+      "target": "StoredProcedure",
+      "cardinality": "one-to-many",
+      "sourceProperty": "id",
+      "targetProperty": "schemaId"
+    },
+    {
+      "name": "SchemaToFunction",
+      "description": "Relationship between a schema and its functions",
+      "source": "Schema",
+      "target": "Function",
+      "cardinality": "one-to-many",
+      "sourceProperty": "id",
+      "targetProperty": "schemaId"
+    },
+    {
+      "name": "TableToTrigger",
+      "description": "Relationship between a table and its triggers",
+      "source": "Table",
+      "target": "Trigger",
+      "cardinality": "one-to-many",
+      "sourceProperty": "id",
+      "targetProperty": "tableId"
+    },
+    {
+      "name": "SchemaToSequence",
+      "description": "Relationship between a schema and its sequences",
+      "source": "Schema",
+      "target": "Sequence",
+      "cardinality": "one-to-many",
+      "sourceProperty": "id",
+      "targetProperty": "schemaId"
+    },
+    {
+      "name": "SchemaToDataType",
+      "description": "Relationship between a schema and its data types",
+      "source": "Schema",
+      "target": "DataType",
+      "cardinality": "one-to-many",
+      "sourceProperty": "id",
+      "targetProperty": "schemaId"
+    },
+    {
+      "name": "ForeignKeyToReferencedTable",
+      "description": "Relationship between a foreign key and its referenced table",
+      "source": "ForeignKey",
+      "target": "Table",
+      "cardinality": "many-to-one",
+      "sourceProperty": "referencedTableId",
+      "targetProperty": "id"
+    }
+  ]
+}

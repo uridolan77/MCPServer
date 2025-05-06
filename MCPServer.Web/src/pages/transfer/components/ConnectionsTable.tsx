@@ -26,6 +26,9 @@ interface Connection {
   lastTestedOn?: string | Date | null;
   connectionString: string;
   connectionStringForDisplay?: string;
+  // Add direct username and password properties
+  username?: string;
+  password?: string;
   connectionDetails?: {
     server?: string;
     database?: string;
@@ -47,6 +50,12 @@ interface ConnectionsTableProps {
 }
 
 export default function ConnectionsTable({ connections, onEdit, onTest, isLoading }: ConnectionsTableProps) {
+  // Log the connections prop to debug
+  console.log('ConnectionsTable received connections:', connections);
+  console.log('ConnectionsTable connections type:', typeof connections);
+  console.log('ConnectionsTable connections is array:', Array.isArray(connections));
+  console.log('ConnectionsTable connections length:', connections?.length);
+
   // Connection columns for DataGrid
   const connectionColumns = [
     { field: 'connectionId', headerName: 'ID', width: 70 },
@@ -198,10 +207,26 @@ export default function ConnectionsTable({ connections, onEdit, onTest, isLoadin
     },
   ];
 
+  // Create a safe rows array for DataGrid
+  const safeRows = Array.isArray(connections) ? connections : [];
+  console.log('Safe rows for DataGrid:', safeRows);
+  console.log('Safe rows length:', safeRows.length);
+  console.log('Safe rows type:', typeof safeRows);
+
+  // Check if rows have connectionId property
+  if (safeRows.length > 0) {
+    console.log('First row has connectionId:', 'connectionId' in safeRows[0]);
+    console.log('Sample row:', safeRows[0]);
+    console.log('Sample row keys:', Object.keys(safeRows[0]));
+    console.log('Sample row connectionId type:', typeof safeRows[0].connectionId);
+  } else {
+    console.warn('No rows to display in ConnectionsTable');
+  }
+
   return (
     <Paper sx={{ height: 500, width: '100%' }}>
       <DataGrid
-        rows={connections || []}
+        rows={safeRows}
         columns={connectionColumns}
         initialState={{
           pagination: {
@@ -209,7 +234,10 @@ export default function ConnectionsTable({ connections, onEdit, onTest, isLoadin
           },
         }}
         pageSizeOptions={[10, 25, 50]}
-        getRowId={(row) => row.connectionId}
+        getRowId={(row) => {
+          console.log('getRowId called with row:', row);
+          return row.connectionId;
+        }}
         loading={isLoading}
         disableRowSelectionOnClick
       />

@@ -1,628 +1,451 @@
-import axios from '@/lib/axios';
+import api from './api';
 
-// Mock data for development and testing when API is unavailable
-const MOCK_DATA = {
-  connections: {
-    $values: [
-      {
-        connectionId: 1,
-        connectionName: "DailyActionsDB",
-        connectionString: "Server=localhost;Database=DailyActionsDB;User ID=sa;Password=********;",
-        description: "Daily actions database",
-        isSource: true,
-        isDestination: false,
-        isActive: true
-      },
-      {
-        connectionId: 13,
-        connectionName: "Test Connection",
-        connectionString: "Server=localhost;Database=TestDB;User ID=testuser;Password=********;",
-        description: "Test connection for development",
-        isSource: true,
-        isDestination: true,
-        isActive: true
-      }
-    ]
-  },
-  configurations: {
-    $values: [
-      {
-        configurationId: 1,
-        configurationName: "Daily Actions Transfer",
-        description: "Transfer daily actions to reporting database",
-        sourceConnection: {
-          connectionId: 1,
-          connectionName: "DailyActionsDB",
-          connectionString: "Server=localhost;Database=DailyActionsDB;User ID=sa;Password=********;",
-          description: "Daily actions database",
-          isSource: true,
-          isDestination: false,
-          isActive: true
-        },
-        destinationConnection: {
-          connectionId: 13,
-          connectionName: "Test Connection",
-          connectionString: "Server=localhost;Database=TestDB;User ID=testuser;Password=********;",
-          description: "Test connection for development",
-          isSource: true,
-          isDestination: true,
-          isActive: true
-        },
-        tableMappings: [
-          {
-            sourceTable: "Actions",
-            destinationTable: "DailyActions",
-            isActive: true
-          }
-        ],
-        isActive: true,
-        schedule: "0 0 * * *",
-        lastRunTime: "2023-06-15T12:00:00Z"
-      }
-    ]
-  },
-  runHistory: {
-    $values: [
-      {
-        runId: 1,
-        configurationId: 1,
-        configurationName: "Daily Actions Transfer",
-        startTime: "2023-06-15T12:00:00Z",
-        endTime: "2023-06-15T12:05:30Z",
-        status: "Completed",
-        rowsTransferred: 1250,
-        errorMessage: null
-      }
-    ]
-  },
-  runDetails: {
-    runId: 1,
-    configurationId: 1,
-    configurationName: "Daily Actions Transfer",
-    startTime: "2023-06-15T12:00:00Z",
-    endTime: "2023-06-15T12:05:30Z",
-    status: "Completed",
-    rowsTransferred: 1250,
-    errorMessage: null,
-    tableMappings: [
-      {
-        sourceTable: "Actions",
-        destinationTable: "DailyActions",
-        rowsTransferred: 1250,
-        errorMessage: null
-      }
-    ]
+/**
+ * Utility function to extract data from nested $values objects in API responses
+ * Handles both single and double-nested $values structures
+ * Also processes nested $values in object properties
+ */
+function extractFromNestedValues(data: any): any {
+  if (!data) return data;
+
+  // Handle top-level $values
+  if (data.$values) {
+    // Handle double-nested $values
+    if (typeof data.$values === 'object' && !Array.isArray(data.$values) && data.$values.$values) {
+      data = data.$values.$values;
+    } else {
+      data = data.$values;
+    }
   }
-};
 
-// Flag to determine if we should use mock data
-const USE_MOCK_DATA = false;
+  // If result is an array, process each item for nested $values
+  if (Array.isArray(data)) {
+    // Extract single item from array if needed
+    if (data.length === 1) {
+      return processObjectProperties(data[0]);
+    }
+
+    // Process each item in the array
+    return data.map(item => processObjectProperties(item));
+  }
+
+  // Process object properties
+  return processObjectProperties(data);
+}
+
+/**
+ * Process object properties to extract nested $values
+ */
+function processObjectProperties(obj: any): any {
+  if (!obj || typeof obj !== 'object') return obj;
+
+  const result = {...obj};
+
+  // Process each property for nested $values
+  for (const key of Object.keys(result)) {
+    if (result[key] && typeof result[key] === 'object') {
+      if (result[key].$values) {
+        result[key] = extractFromNestedValues(result[key]);
+      } else if (Array.isArray(result[key])) {
+        result[key] = result[key].map((item: any) =>
+          item && typeof item === 'object' && item.$values ?
+            extractFromNestedValues(item) : item
+        );
+      }
+    }
+  }
+
+  return result;
+}
 
 class DataTransferService {
-  // Connection management
-  async getConnections() {
+  // Database connections
+  static async getConnections() {
     try {
-      const response = await axios.get('data-transfer/connections');
-      console.log('Raw connections response:', response.data);
+      const response = await api.get('/data-transfer/connections');
 
-      // If the response doesn't have a $values property, wrap it in one
-      if (response.data && !response.data.$values) {
-        return { $values: [] };
-      }
+      // Extract data from nested $values
+      const connections = extractFromNestedValues(response.data);
 
-      // If $values is null or undefined, return an empty array
-      if (!response.data.$values) {
-        return { $values: [] };
-      }
+      // Process each connection to ensure proper casing of property names
+      const processedConnections = Array.isArray(connections) ? connections.map(conn => {
+        if (!conn) return null;
 
-      // Handle nested $values structure
-      if (response.data.$values && response.data.$values.$values && Array.isArray(response.data.$values.$values)) {
-        console.log('Found nested $values structure, extracting inner array:', response.data.$values.$values);
-        return { $values: response.data.$values.$values };
-      }
+        // Create a new object with camelCase property names
+        const processedConn: any = {};
 
-      // Ensure $values is an array
-      if (!Array.isArray(response.data.$values)) {
-        console.warn('$values is not an array, converting to array:', response.data.$values);
-        return { $values: [] };
-      }
+        // Map each property with proper casing
+        if (conn.ConnectionId !== undefined) processedConn.connectionId = conn.ConnectionId;
+        else if (conn.connectionId !== undefined) processedConn.connectionId = conn.connectionId;
 
-      // Process each connection to handle hashed connection strings
-      if (Array.isArray(response.data.$values)) {
-        response.data.$values = response.data.$values.map((connection: any) => {
-          // If the connection string starts with "HASHED:", set connectionStringForDisplay
-          if (connection.connectionString && connection.connectionString.startsWith('HASHED:')) {
-            // Extract server and database info from the hashed string
-            const serverMatch = connection.connectionString.match(/Server=([^;]+)/i);
-            const databaseMatch = connection.connectionString.match(/Database=([^;]+)/i);
+        if (conn.ConnectionName !== undefined) processedConn.connectionName = conn.ConnectionName;
+        else if (conn.connectionName !== undefined) processedConn.connectionName = conn.connectionName;
 
-            const server = serverMatch ? serverMatch[1] : 'unknown';
-            const database = databaseMatch ? databaseMatch[1] : 'unknown';
+        if (conn.ConnectionString !== undefined) processedConn.connectionString = conn.ConnectionString;
+        else if (conn.connectionString !== undefined) processedConn.connectionString = conn.connectionString;
 
-            // Create a dummy connection string for display
-            connection.connectionStringForDisplay = `Server=${server};Database=${database};User ID=********;Password=********;`;
+        if (conn.Description !== undefined) processedConn.description = conn.Description;
+        else if (conn.description !== undefined) processedConn.description = conn.description;
 
-            // Create connection details object
-            connection.connectionDetails = {
-              server,
-              database,
-              username: '********', // Masked for security
-              password: '********', // Masked for security
-            };
+        if (conn.IsActive !== undefined) processedConn.isActive = conn.IsActive;
+        else if (conn.isActive !== undefined) processedConn.isActive = conn.isActive;
+
+        if (conn.ConnectionAccessLevel !== undefined) processedConn.connectionAccessLevel = conn.ConnectionAccessLevel;
+        else if (conn.connectionAccessLevel !== undefined) processedConn.connectionAccessLevel = conn.connectionAccessLevel;
+
+        if (conn.LastTestedOn !== undefined) processedConn.lastTestedOn = conn.LastTestedOn;
+        else if (conn.lastTestedOn !== undefined) processedConn.lastTestedOn = conn.lastTestedOn;
+
+        if (conn.CreatedOn !== undefined) processedConn.createdOn = conn.CreatedOn;
+        else if (conn.createdOn !== undefined) processedConn.createdOn = conn.createdOn;
+
+        if (conn.LastModifiedOn !== undefined) processedConn.lastModifiedOn = conn.LastModifiedOn;
+        else if (conn.lastModifiedOn !== undefined) processedConn.lastModifiedOn = conn.lastModifiedOn;
+
+        if (conn.MaxPoolSize !== undefined) processedConn.maxPoolSize = conn.MaxPoolSize;
+        else if (conn.maxPoolSize !== undefined) processedConn.maxPoolSize = conn.maxPoolSize;
+
+        if (conn.MinPoolSize !== undefined) processedConn.minPoolSize = conn.MinPoolSize;
+        else if (conn.minPoolSize !== undefined) processedConn.minPoolSize = conn.minPoolSize;
+
+        // Copy any other properties that might exist
+        for (const key in conn) {
+          if (!processedConn.hasOwnProperty(key.charAt(0).toLowerCase() + key.slice(1))) {
+            const camelCaseKey = key.charAt(0).toLowerCase() + key.slice(1);
+            processedConn[camelCaseKey] = conn[key];
           }
+        }
 
-          return connection;
-        });
-      }
+        return processedConn;
+      }).filter(Boolean) : []; // Remove any null entries
 
-      return response.data;
+      return processedConnections;
     } catch (error) {
-      console.error('Error fetching connections:', error);
-      // Return empty array in case of error
-      return { $values: [] };
+      console.error('Error in getConnections:', error);
+      return [];
     }
   }
 
-  async getConnection(id: number) {
+  static async getConnection(id: number) {
     try {
-      const response = await axios.get(`data-transfer/connections/${id}`);
-
-      // Process the connection to handle hashed connection string
-      if (response.data && response.data.connectionString && response.data.connectionString.startsWith('HASHED:')) {
-        // Extract server and database info from the hashed string
-        const serverMatch = response.data.connectionString.match(/Server=([^;]+)/i);
-        const databaseMatch = response.data.connectionString.match(/Database=([^;]+)/i);
-
-        const server = serverMatch ? serverMatch[1] : 'unknown';
-        const database = databaseMatch ? databaseMatch[1] : 'unknown';
-
-        // Create a dummy connection string for display
-        response.data.connectionStringForDisplay = `Server=${server};Database=${database};User ID=********;Password=********;`;
-
-        // Create connection details object
-        response.data.connectionDetails = {
-          server,
-          database,
-          username: '********', // Masked for security
-          password: '********', // Masked for security
-        };
-      }
-
-      return response.data;
+      const response = await api.get(`/data-transfer/connections/${id}`);
+      return extractFromNestedValues(response.data);
     } catch (error) {
-      console.warn(`Using mock data for connection ${id} due to API error:`, error);
-      if (USE_MOCK_DATA) {
-        const connection = MOCK_DATA.connections.$values.find(c => c.connectionId === id);
-        return connection || null;
-      }
-      return null;
-    }
-  }
-
-  async saveConnection(connection: any) {
-    try {
-      // Ensure we have a valid connection object
-      if (!connection || !connection.connectionName || !connection.connectionString) {
-        throw new Error('Invalid connection data: Connection name and connection string are required');
-      }
-
-      // Make sure connection purpose is set
-      if (connection.isSource === undefined && connection.isDestination === undefined) {
-        connection.isSource = true;
-        connection.isDestination = true;
-      }
-
-      // Set default values if not provided
-      connection.isActive = connection.isActive !== undefined ? connection.isActive : true;
-      connection.maxPoolSize = connection.maxPoolSize || 100;
-      connection.minPoolSize = connection.minPoolSize || 5;
-
-      // Hash the connection string for security
-      // Note: The actual hashing is done on the server side, but we'll mark it here
-      console.log('Connection string will be hashed on the server side for security');
-
-      // Format the connection data correctly for the API
-      const formattedConnection = { ...connection };
-
-      // Convert string enum values to numeric enum values
-      if (typeof formattedConnection.connectionAccessLevel === 'string') {
-        switch (formattedConnection.connectionAccessLevel) {
-          case 'ReadOnly':
-            formattedConnection.connectionAccessLevel = 0;
-            break;
-          case 'WriteOnly':
-            formattedConnection.connectionAccessLevel = 1;
-            break;
-          case 'ReadWrite':
-            formattedConnection.connectionAccessLevel = 2;
-            break;
-          default:
-            // Default to ReadWrite if invalid value
-            formattedConnection.connectionAccessLevel = 2;
-        }
-      }
-
-      // Ensure required fields are present
-      if (!formattedConnection.lastModifiedBy) {
-        formattedConnection.lastModifiedBy = "System";
-      }
-
-      if (!formattedConnection.createdBy) {
-        formattedConnection.createdBy = "System";
-      }
-
-      if (!formattedConnection.createdOn) {
-        formattedConnection.createdOn = new Date().toISOString();
-      }
-
-      if (!formattedConnection.lastModifiedOn) {
-        formattedConnection.lastModifiedOn = new Date().toISOString();
-      }
-
-      console.log('Saving connection:', formattedConnection);
-
-      // Always use POST for both creating and updating connections
-      // The API uses the connectionId to determine if it's an update or create
-      const response = await axios.post('data-transfer/connections', formattedConnection);
-      return response.data;
-    } catch (error: any) {
-      console.error('Error saving connection:', error);
-
-      // Check if we have a structured error response from the API
-      if (error.response) {
-        // If it's a conflict (409) with an existing connection, pass through the response
-        if (error.response.status === 409) {
-          throw error;
-        }
-
-        // For other error responses, extract the error message
-        const errorMessage = error.response.data?.message ||
-                            error.response.data?.error ||
-                            'Failed to save connection';
-
-        const enhancedError = new Error(errorMessage);
-        enhancedError.name = 'SaveConnectionError';
-        throw enhancedError;
-      }
-
-      // If using mock data is enabled, simulate saving
-      if (USE_MOCK_DATA) {
-        console.warn('Using mock data for saving connection');
-        if (connection.connectionId) {
-          // Update existing
-          const index = MOCK_DATA.connections.$values.findIndex(c => c.connectionId === connection.connectionId);
-          if (index >= 0) {
-            MOCK_DATA.connections.$values[index] = { ...connection };
-          }
-        } else {
-          // Add new with generated ID
-          const newId = Math.max(...MOCK_DATA.connections.$values.map(c => c.connectionId), 0) + 1;
-          const newConnection = { ...connection, connectionId: newId };
-          MOCK_DATA.connections.$values.push(newConnection);
-          return newConnection;
-        }
-        return connection;
-      }
-
-      // For network or other errors
-      throw new Error(`Failed to save connection: ${error.message}`);
-    }
-  }
-
-  async deleteConnection(id: number) {
-    try {
-      const response = await axios.delete(`data-transfer/connections/${id}`);
-      return response.data;
-    } catch (error) {
-      console.warn(`Using mock data for deleting connection ${id} due to API error:`, error);
-      if (USE_MOCK_DATA) {
-        // Simulate deletion by removing from mock data
-        const index = MOCK_DATA.connections.$values.findIndex(c => c.connectionId === id);
-        if (index >= 0) {
-          MOCK_DATA.connections.$values.splice(index, 1);
-        }
-        return { success: true };
-      }
+      console.error('Error in getConnection:', error);
       throw error;
     }
   }
 
-  async testConnection(data: any) {
-    // Check if we're receiving the new structure with a connection property
-    // or the old structure with connection properties directly
-    const connectionData = data.connection || data;
-
+  static async saveConnection(connection: any) {
     try {
-      // Ensure connectionAccessLevel is properly formatted as an enum value (0, 1, 2)
-      // instead of a string ('ReadOnly', 'WriteOnly', 'ReadWrite')
-      const formattedConnection = { ...connectionData };
+      // Just log the connection data for debugging
+      console.log('Saving connection with data:', connection);
 
-      // Convert string enum values to numeric enum values
-      if (typeof formattedConnection.connectionAccessLevel === 'string') {
-        switch (formattedConnection.connectionAccessLevel) {
-          case 'ReadOnly':
-            formattedConnection.connectionAccessLevel = 0;
-            break;
-          case 'WriteOnly':
-            formattedConnection.connectionAccessLevel = 1;
-            break;
-          case 'ReadWrite':
-            formattedConnection.connectionAccessLevel = 2;
-            break;
-          default:
-            // Default to ReadWrite if invalid value
-            formattedConnection.connectionAccessLevel = 2;
-        }
-      }
-
-      // Ensure required fields are present
-      if (!formattedConnection.lastModifiedBy) {
-        formattedConnection.lastModifiedBy = "System";
-      }
-
-      if (!formattedConnection.createdBy) {
-        formattedConnection.createdBy = "System";
-      }
-
-      console.log('Sending connection test request with data:', formattedConnection);
-      const response = await axios.post('data-transfer/connections/test', formattedConnection);
-
-      // Ensure we return a properly formatted response
-      if (response && response.data) {
-        return {
-          success: response.data.success || false,
-          message: response.data.message || 'Connection test completed',
-          server: response.data.server || '',
-          database: response.data.database || '',
-          testQueryResult: response.data.testQueryResult || 0
-        };
-      } else {
-        return {
-          success: false,
-          message: 'Invalid response from server',
-          server: '',
-          database: '',
-          testQueryResult: 0
-        };
-      }
+      // Both create and update use the same POST endpoint
+      const response = await api.post('/data-transfer/connections', connection);
+      return response.data;
     } catch (error: any) {
-      console.error('Connection test error:', error);
+      console.error('Error saving connection:', error);
+      throw error;
+    }
+  }
 
-      // Log detailed error information to console for debugging
-      if (error.response) {
-        console.error('Response status:', error.response.status);
-        console.error('Response data:', error.response.data);
-      }
+  static async testConnection(connection: any) {
+    try {
+      // Just log the connection data for debugging
+      console.log('Testing connection with data:', connection);
 
-      // Check if we have a structured error response from the API
+      const response = await api.post('/data-transfer/connections/test', connection);
+      return response.data;
+    } catch (error: any) {
       if (error.response && error.response.data) {
-        const errorData = error.response.data;
-
-        // Extract connection details if available
-        const connectionDetails = errorData.connectionDetails || {};
-
         return {
           success: false,
-          message: errorData.message || errorData.error || 'Connection failed',
-          detailedError: errorData.detailedError || errorData.error || error.message,
-          server: connectionDetails.server || errorData.server || '',
-          database: connectionDetails.database || '',
-          errorCode: errorData.errorCode,
-          errorType: errorData.exceptionType,
-          innerException: errorData.innerException,
-          error: errorData.detailedError || errorData.error || error.message
+          message: error.response.data.message || error.response.data.error || 'Connection test failed'
         };
       }
 
-      // If using mock data is enabled, return mock success
-      if (USE_MOCK_DATA) {
-        console.warn('Using mock data for testing connection');
-        return {
-          success: true,
-          message: "Connection successful (mock)",
-          server: connectionData.connectionString?.split(';').find((s: string) => s.startsWith('Server='))?.split('=')[1] || 'localhost',
-          database: connectionData.connectionString?.split(';').find((s: string) => s.startsWith('Database='))?.split('=')[1] || 'TestDB',
-          testQueryResult: 1
-        };
-      }
-
-      // Return a formatted error response for other types of errors
       return {
         success: false,
-        message: error.message || 'Connection test failed',
-        detailedError: error.message,
-        server: '',
-        database: '',
-        errorType: error.name,
-        error: error.message
+        message: error.message || 'Connection test failed'
       };
     }
   }
 
-  // Configuration management
-  async getConfigurations() {
+  // Database schema operations
+  static async getDatabaseSchema(connectionId: number) {
     try {
-      const response = await axios.get('data-transfer/configurations');
-      console.log('Raw configurations response:', response.data);
-
-      // If the response doesn't have a $values property, wrap it in one
-      if (response.data && !response.data.$values) {
-        return { $values: [] };
-      }
-
-      // If $values is null or undefined, return an empty array
-      if (!response.data.$values) {
-        return { $values: [] };
-      }
-
-      // Handle nested $values structure
-      if (response.data.$values && response.data.$values.$values && Array.isArray(response.data.$values.$values)) {
-        console.log('Found nested $values structure, extracting inner array:', response.data.$values.$values);
-        return { $values: response.data.$values.$values };
-      }
-
-      // Ensure $values is an array
-      if (!Array.isArray(response.data.$values)) {
-        console.warn('$values is not an array, converting to array:', response.data.$values);
-        return { $values: [] };
-      }
-
-      return response.data;
+      const response = await api.get(`/data-transfer/schema/${connectionId}`);
+      return extractFromNestedValues(response.data);
     } catch (error) {
-      console.error('Error fetching configurations:', error);
-      // Return empty array in case of error
-      return { $values: [] };
-    }
-  }
-
-  async getConfiguration(id: number) {
-    try {
-      const response = await axios.get(`data-transfer/configurations/${id}`);
-      return response.data;
-    } catch (error) {
-      console.warn(`Using mock data for configuration ${id} due to API error:`, error);
-      if (USE_MOCK_DATA) {
-        const config = MOCK_DATA.configurations.$values.find(c => c.configurationId === id);
-        return config || null;
-      }
-      return null;
-    }
-  }
-
-  async saveConfiguration(configuration: any) {
-    try {
-      // Always use POST for both creating and updating configurations
-      // The API uses the configurationId to determine if it's an update or create
-      const response = await axios.post('data-transfer/configurations', configuration);
-      return response.data;
-    } catch (error) {
-      console.warn('Using mock data for saving configuration due to API error:', error);
-      if (USE_MOCK_DATA) {
-        // Simulate saving by adding to mock data
-        if (configuration.configurationId) {
-          // Update existing
-          const index = MOCK_DATA.configurations.$values.findIndex(c => c.configurationId === configuration.configurationId);
-          if (index >= 0) {
-            MOCK_DATA.configurations.$values[index] = { ...configuration };
-          }
-        } else {
-          // Add new with generated ID
-          const newId = Math.max(...MOCK_DATA.configurations.$values.map(c => c.configurationId), 0) + 1;
-          const newConfig = { ...configuration, configurationId: newId };
-          MOCK_DATA.configurations.$values.push(newConfig);
-          return newConfig;
-        }
-        return configuration;
-      }
+      console.error('Error in getDatabaseSchema:', error);
       throw error;
     }
   }
 
-  async deleteConfiguration(id: number) {
+  static async getDatabaseSchemaByConnectionString(connectionString: string) {
     try {
-      const response = await axios.delete(`data-transfer/configurations/${id}`);
-      return response.data;
+      const response = await api.post('/data-transfer/schema', { connectionString });
+      return extractFromNestedValues(response.data);
     } catch (error) {
-      console.warn(`Using mock data for deleting configuration ${id} due to API error:`, error);
-      if (USE_MOCK_DATA) {
-        // Simulate deletion by removing from mock data
-        const index = MOCK_DATA.configurations.$values.findIndex(c => c.configurationId === id);
-        if (index >= 0) {
-          MOCK_DATA.configurations.$values.splice(index, 1);
-        }
-        return { success: true };
-      }
+      console.error('Error in getDatabaseSchemaByConnectionString:', error);
       throw error;
     }
   }
 
-  // Run management
-  async executeTransfer(configurationId: number) {
+  // Method to fetch database schema using connection data object
+  static async fetchDatabaseSchema(connectionData: any) {
     try {
-      const response = await axios.post(`data-transfer/configurations/${configurationId}/execute`);
-      return response.data;
+      // Just log the connection data for debugging
+      console.log('Fetching database schema with data:', connectionData);
+
+      // If connectionId is provided, use getDatabaseSchema
+      if (connectionData.connectionId) {
+        return await this.getDatabaseSchema(connectionData.connectionId);
+      }
+      // Otherwise use the connection string
+      else if (connectionData.connectionString) {
+        return await this.getDatabaseSchemaByConnectionString(connectionData.connectionString);
+      } else {
+        throw new Error('No connection ID or connection string provided');
+      }
     } catch (error) {
-      console.error(`Error executing transfer ${configurationId}:`, error);
+      console.error('Error in fetchDatabaseSchema:', error);
       throw error;
     }
   }
 
-  async testConfiguration(configurationId: number) {
+  // Configuration operations
+  static async getConfigurations() {
     try {
-      const response = await axios.post(`data-transfer/configurations/${configurationId}/test`);
-      return response.data;
-    } catch (error) {
-      console.error(`Error testing configuration ${configurationId}:`, error);
-      throw error;
-    }
-  }
+      const response = await api.get('/data-transfer/configurations');
 
-  async getRunHistory(configurationId = 0, limit = 50) {
-    try {
-      const response = await axios.get(`data-transfer/history?configurationId=${configurationId}&limit=${limit}`);
-      console.log('Raw run history response:', response.data);
+      // Extract data from nested $values
+      const configurations = extractFromNestedValues(response.data);
 
-      // If the response doesn't have a $values property, wrap it in one
-      if (response.data && !response.data.$values) {
-        return { $values: [] };
-      }
+      // Process each configuration to ensure proper casing of property names
+      const processedConfigurations = Array.isArray(configurations) ? configurations.map(config => {
+        if (!config) return null;
 
-      // If $values is null or undefined, return an empty array
-      if (!response.data.$values) {
-        return { $values: [] };
-      }
+        // Create a new object with camelCase property names
+        const processedConfig: any = {};
 
-      // Handle nested $values structure
-      if (response.data.$values && response.data.$values.$values && Array.isArray(response.data.$values.$values)) {
-        console.log('Found nested $values structure, extracting inner array:', response.data.$values.$values);
-        return { $values: response.data.$values.$values };
-      }
+        // Map each property with proper casing
+        if (config.ConfigurationId !== undefined) processedConfig.configurationId = config.ConfigurationId;
+        else if (config.configurationId !== undefined) processedConfig.configurationId = config.configurationId;
 
-      // Ensure $values is an array
-      if (!Array.isArray(response.data.$values)) {
-        console.warn('$values is not an array, converting to array:', response.data.$values);
-        return { $values: [] };
-      }
+        if (config.ConfigurationName !== undefined) processedConfig.configurationName = config.ConfigurationName;
+        else if (config.configurationName !== undefined) processedConfig.configurationName = config.configurationName;
 
-      return response.data;
-    } catch (error) {
-      console.error(`Error fetching run history (configId: ${configurationId}):`, error);
-      // Return empty array in case of error
-      return { $values: [] };
-    }
-  }
+        if (config.Description !== undefined) processedConfig.description = config.Description;
+        else if (config.description !== undefined) processedConfig.description = config.description;
 
-  async getRunDetails(runId: number) {
-    try {
-      const response = await axios.get(`data-transfer/runs/${runId}`);
-      return response.data;
-    } catch (error) {
-      console.warn(`Using mock data for run details ${runId} due to API error:`, error);
-      if (USE_MOCK_DATA) {
-        if (runId === 1) {
-          return MOCK_DATA.runDetails;
-        }
+        if (config.IsActive !== undefined) processedConfig.isActive = config.IsActive;
+        else if (config.isActive !== undefined) processedConfig.isActive = config.isActive;
 
-        // For other run IDs, generate mock details based on run history
-        const run = MOCK_DATA.runHistory.$values.find(r => r.runId === runId);
-        if (run) {
-          return {
-            ...run,
-            tableMappings: [
-              {
-                sourceTable: "Table1",
-                destinationTable: "DestTable1",
-                rowsTransferred: run.rowsTransferred,
-                errorMessage: null
-              }
-            ]
+        if (config.BatchSize !== undefined) processedConfig.batchSize = config.BatchSize;
+        else if (config.batchSize !== undefined) processedConfig.batchSize = config.batchSize;
+
+        if (config.ReportingFrequency !== undefined) processedConfig.reportingFrequency = config.ReportingFrequency;
+        else if (config.reportingFrequency !== undefined) processedConfig.reportingFrequency = config.reportingFrequency;
+
+        // Process nested objects like SourceConnection and DestinationConnection
+        if (config.SourceConnection) {
+          processedConfig.sourceConnection = {
+            connectionId: config.SourceConnection.ConnectionId || config.SourceConnection.connectionId,
+            connectionName: config.SourceConnection.ConnectionName || config.SourceConnection.connectionName,
+            connectionString: config.SourceConnection.ConnectionString || config.SourceConnection.connectionString,
+            description: config.SourceConnection.Description || config.SourceConnection.description || '',
+            isActive: config.SourceConnection.IsActive !== undefined ? config.SourceConnection.IsActive :
+                     (config.SourceConnection.isActive !== undefined ? config.SourceConnection.isActive : true)
           };
+        } else if (config.sourceConnection) {
+          processedConfig.sourceConnection = config.sourceConnection;
         }
-        return null;
-      }
-      return null;
+
+        if (config.DestinationConnection) {
+          processedConfig.destinationConnection = {
+            connectionId: config.DestinationConnection.ConnectionId || config.DestinationConnection.connectionId,
+            connectionName: config.DestinationConnection.ConnectionName || config.DestinationConnection.connectionName,
+            connectionString: config.DestinationConnection.ConnectionString || config.DestinationConnection.connectionString,
+            description: config.DestinationConnection.Description || config.DestinationConnection.description || '',
+            isActive: config.DestinationConnection.IsActive !== undefined ? config.DestinationConnection.IsActive :
+                     (config.DestinationConnection.isActive !== undefined ? config.DestinationConnection.isActive : true)
+          };
+        } else if (config.destinationConnection) {
+          processedConfig.destinationConnection = config.destinationConnection;
+        }
+
+        // Process table mappings array
+        if (config.TableMappings && Array.isArray(config.TableMappings)) {
+          processedConfig.tableMappings = config.TableMappings.map((mapping: any) => ({
+            tableMappingId: mapping.TableMappingId || mapping.tableMappingId,
+            sourceTable: mapping.SourceTable || mapping.sourceTable,
+            destinationTable: mapping.DestinationTable || mapping.destinationTable,
+            isActive: mapping.IsActive !== undefined ? mapping.IsActive :
+                     (mapping.isActive !== undefined ? mapping.isActive : true)
+          }));
+        } else if (config.tableMappings && Array.isArray(config.tableMappings)) {
+          processedConfig.tableMappings = config.tableMappings;
+        } else {
+          processedConfig.tableMappings = [];
+        }
+
+        // Copy any other properties that might exist
+        for (const key in config) {
+          if (!processedConfig.hasOwnProperty(key.charAt(0).toLowerCase() + key.slice(1))) {
+            const camelCaseKey = key.charAt(0).toLowerCase() + key.slice(1);
+            processedConfig[camelCaseKey] = config[key];
+          }
+        }
+
+        return processedConfig;
+      }).filter(Boolean) : []; // Remove any null entries
+
+      return processedConfigurations;
+    } catch (error) {
+      console.error('Error in getConfigurations:', error);
+      return [];
+    }
+  }
+
+  static async getConfiguration(id: number) {
+    try {
+      const response = await api.get(`/data-transfer/configurations/${id}`);
+      return extractFromNestedValues(response.data);
+    } catch (error) {
+      console.error('Error in getConfiguration:', error);
+      throw error;
+    }
+  }
+
+  static async saveConfiguration(configuration: any) {
+    if (configuration.configurationId) {
+      // Update existing configuration
+      const response = await api.put(`/data-transfer/configurations/${configuration.configurationId}`, configuration);
+      return response.data;
+    } else {
+      // Create new configuration
+      const response = await api.post('/data-transfer/configurations', configuration);
+      return response.data;
+    }
+  }
+
+  static async deleteConfiguration(id: number) {
+    const response = await api.delete(`/data-transfer/configurations/${id}`);
+    return response.data;
+  }
+
+  static async testConfiguration(id: number) {
+    const response = await api.post(`/data-transfer/configurations/${id}/test`);
+    return response.data;
+  }
+
+  static async executeTransfer(id: number) {
+    const response = await api.post(`/data-transfer/configurations/${id}/execute`);
+    return response.data;
+  }
+
+  // Run history operations
+  static async getRunHistory(configurationId: number = 0) {
+    try {
+      const url = configurationId
+        ? `/data-transfer/history?configurationId=${configurationId}`
+        : '/data-transfer/history';
+
+      const response = await api.get(url);
+
+      // Extract data from nested $values
+      const runHistory = extractFromNestedValues(response.data);
+
+      // Process each run history item to ensure proper casing of property names
+      const processedRunHistory = Array.isArray(runHistory) ? runHistory.map(item => {
+        if (!item) return null;
+
+        // Create a new object with camelCase property names
+        const processedItem: any = {};
+
+        // Map each property with proper casing
+        if (item.RunId !== undefined) processedItem.runId = item.RunId;
+        else if (item.runId !== undefined) processedItem.runId = item.runId;
+
+        if (item.ConfigurationId !== undefined) processedItem.configurationId = item.ConfigurationId;
+        else if (item.configurationId !== undefined) processedItem.configurationId = item.configurationId;
+
+        if (item.ConfigurationName !== undefined) processedItem.configurationName = item.ConfigurationName;
+        else if (item.configurationName !== undefined) processedItem.configurationName = item.configurationName;
+
+        if (item.StartTime !== undefined) processedItem.startTime = item.StartTime;
+        else if (item.startTime !== undefined) processedItem.startTime = item.startTime;
+
+        if (item.EndTime !== undefined) processedItem.endTime = item.EndTime;
+        else if (item.endTime !== undefined) processedItem.endTime = item.endTime;
+
+        if (item.Status !== undefined) processedItem.status = item.Status;
+        else if (item.status !== undefined) processedItem.status = item.status;
+
+        if (item.TablesProcessed !== undefined) processedItem.tablesProcessed = item.TablesProcessed;
+        else if (item.tablesProcessed !== undefined) processedItem.tablesProcessed = item.tablesProcessed;
+
+        if (item.RowsProcessed !== undefined) processedItem.rowsProcessed = item.RowsProcessed;
+        else if (item.rowsProcessed !== undefined) processedItem.rowsProcessed = item.rowsProcessed;
+
+        if (item.ElapsedTime !== undefined) processedItem.elapsedTime = item.ElapsedTime;
+        else if (item.elapsedTime !== undefined) processedItem.elapsedTime = item.elapsedTime;
+
+        // Copy any other properties that might exist
+        for (const key in item) {
+          if (!processedItem.hasOwnProperty(key.charAt(0).toLowerCase() + key.slice(1))) {
+            const camelCaseKey = key.charAt(0).toLowerCase() + key.slice(1);
+            processedItem[camelCaseKey] = item[key];
+          }
+        }
+
+        return processedItem;
+      }).filter(Boolean) : []; // Remove any null entries
+
+      return processedRunHistory;
+    } catch (error) {
+      console.error('Error in getRunHistory:', error);
+      return [];
+    }
+  }
+
+  static async getRunDetails(runId: number) {
+    try {
+      const response = await api.get(`/data-transfer/history/${runId}`);
+      return extractFromNestedValues(response.data);
+    } catch (error) {
+      console.error('Error in getRunDetails:', error);
+      throw error;
+    }
+  }
+
+  // Schema operations
+  static async saveSchema(schema: any) {
+    const response = await api.post('/data-transfer/schema/save', schema);
+    return response.data;
+  }
+
+  static async getSchemas() {
+    try {
+      const response = await api.get('/data-transfer/schemas');
+      return extractFromNestedValues(response.data);
+    } catch (error) {
+      console.error('Error in getSchemas:', error);
+      return [];
+    }
+  }
+
+  static async getSchema(id: number) {
+    try {
+      const response = await api.get(`/data-transfer/schemas/${id}`);
+      return extractFromNestedValues(response.data);
+    } catch (error) {
+      console.error('Error in getSchema:', error);
+      throw error;
     }
   }
 }
 
-export default new DataTransferService();
+export default DataTransferService;

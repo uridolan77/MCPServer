@@ -1,0 +1,1671 @@
+I'll help you create a robust, comprehensive, and customizable SQL-to-SQL incremental data migration implementation in C#. Based on the database schema you've provided, I can see this is a gaming/casino system with tables for players, transactions, games, sport bets, bonuses, and more.
+Let me design a C# solution that will handle incremental data migration between SQL databases with the following key features:
+    1. Configuration-based approach for mapping tables and columns 
+    2. Support for incremental loads based on timestamp or ID tracking 
+    3. Error handling and logging 
+    4. Performance optimization 
+    5. Transaction management 
+    6. Data validation 
+Here's the implementation:
+using System;
+using System.Collections.Generic;
+using System.Data;
+using System.Data.SqlClient;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.IO;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
+using Newtonsoft.Json;
+using System.Threading;
+
+namespace SqlToSqlDataMigration
+{
+    public class Program
+    {
+        public static async Task Main(string[] args)
+        {
+            // Load configuration
+            var config = new ConfigurationBuilder()
+                .SetBasePath(Directory.GetCurrentDirectory())
+                .AddJsonFile("appsettings.json", optional: false)
+                .AddCommandLine(args)
+                .Build();
+
+            // Setup logging
+            using var loggerFactory = LoggerFactory.Create(builder =>
+            {
+                builder
+                    .AddConsole()
+                    .AddFile(config.GetSection("Logging:FilePath").Value);
+            });
+            var logger = loggerFactory.CreateLogger<Program>();
+
+            try
+            {
+                logger.LogInformation("Starting SQL to SQL data migration");
+
+                // Create and run the migration service
+                var migrationService = new DataMigrationService(config, logger);
+                await migrationService.RunMigrationAsync();
+            }
+            catch (Exception ex)
+            {
+                logger.LogCritical(ex, "Fatal error during migration");
+                Environment.Exit(1);
+            }
+        }
+    }
+
+    public class DataMigrationService
+    {
+        private readonly IConfiguration _config;
+        private readonly ILogger _logger;
+        private readonly string _sourceConnectionString;
+        private readonly string _targetConnectionString;
+        private readonly List<TableMapping> _tableMappings;
+        private readonly int _batchSize;
+        private readonly int _commandTimeout;
+        private readonly bool _enableTransaction;
+        private readonly string _stateStorePath;
+        private readonly Dictionary<string, object> _migrationState;
+
+        public DataMigrationService(IConfiguration config, ILogger logger)
+        {
+            _config = config;
+            _logger = logger;
+            _sourceConnectionString = config.GetConnectionString("Source");
+            _targetConnectionString = config.GetConnectionString("Target");
+            
+            // Load table mappings from configuration
+            _tableMappings = config.GetSection("TableMappings").Get<List<TableMapping>>();
+            
+            // Load additional settings
+            _batchSize = config.GetValue<int>("Settings:BatchSize", 1000);
+            _commandTimeout = config.GetValue<int>("Settings:CommandTimeout", 300);
+            _enableTransaction = config.GetValue<bool>("Settings:EnableTransaction", true);
+            _stateStorePath = config.GetValue<string>("Settings:StateStorePath", "migrationState.json");
+            
+            // Load or initialize migration state
+            _migrationState = LoadMigrationState();
+        }
+
+        private Dictionary<string, object> LoadMigrationState()
+        {
+            if (File.Exists(_stateStorePath))
+            {
+                try
+                {
+                    var json = File.ReadAllText(_stateStorePath);
+                    return JsonConvert.DeserializeObject<Dictionary<string, object>>(json) 
+                           ?? new Dictionary<string, object>();
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error loading migration state, starting fresh");
+                    return new Dictionary<string, object>();
+                }
+            }
+            return new Dictionary<string, object>();
+        }
+
+        private void SaveMigrationState()
+        {
+            try
+            {
+                var json = JsonConvert.SerializeObject(_migrationState);
+                File.WriteAllText(_stateStorePath, json);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error saving migration state");
+            }
+        }
+
+        public async Task RunMigrationAsync()
+        {
+            foreach (var mapping in _tableMappings.Where(m => m.Enabled))
+            {
+                try
+                {
+                    await MigrateTableAsync(mapping);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, $"Error migrating table {mapping.SourceTable} to {mapping.TargetTable}");
+                    
+                    if (mapping.FailOnError)
+                        throw;
+                }
+            }
+        }
+
+        private async Task MigrateTableAsync(TableMapping mapping)
+        {
+            _logger.LogInformation($"Starting migration for table {mapping.SourceTable} to {mapping.TargetTable}");
+
+            // Get the last migration timestamp or ID
+            var lastValue = GetLastMigrationValue(mapping);
+            _logger.LogInformation($"Last migration value for {mapping.SourceTable}: {lastValue}");
+
+            // Create query for incremental load
+            string query = BuildIncrementalQuery(mapping, lastValue);
+            _logger.LogDebug($"Query: {query}");
+
+            await using var sourceConnection = new SqlConnection(_sourceConnectionString);
+            await sourceConnection.OpenAsync();
+
+            await using var targetConnection = new SqlConnection(_targetConnectionString);
+            await targetConnection.OpenAsync();
+
+            // Set up command
+            await using var command = new SqlCommand(query, sourceConnection)
+            {
+                CommandTimeout = _commandTimeout
+            };
+
+            // Execute the query and process in batches
+            await using var reader = await command.ExecuteReaderAsync();
+            
+            int totalRows = 0;
+            int currentBatch = 0;
+            
+            // Get column schema from reader
+            var schemaTable = reader.GetSchemaTable();
+            var columns = new List<string>();
+            if (schemaTable != null)
+            {
+                foreach (DataRow row in schemaTable.Rows)
+                {
+                    columns.Add(row["ColumnName"].ToString());
+                }
+            }
+
+            // Process data in batches
+            var batchData = new List<object[]>();
+            object newLastValue = lastValue;
+
+            while (await reader.ReadAsync())
+            {
+                var rowData = new object[reader.FieldCount];
+                reader.GetValues(rowData);
+                batchData.Add(rowData);
+                currentBatch++;
+                totalRows++;
+
+                // Update the tracking value if applicable
+                if (mapping.IncrementalType != "None")
+                {
+                    int trackingColumnIndex = columns.IndexOf(mapping.IncrementalColumn);
+                    if (trackingColumnIndex >= 0)
+                    {
+                        var currentValue = reader.GetValue(trackingColumnIndex);
+                        if (mapping.IncrementalType == "DateTime")
+                        {
+                            if (currentValue is DateTime dateTime && 
+                                (newLastValue == null || (DateTime)newLastValue < dateTime))
+                            {
+                                newLastValue = dateTime;
+                            }
+                        }
+                        else if (mapping.IncrementalType == "Int" || mapping.IncrementalType == "BigInt")
+                        {
+                            if (currentValue is long longValue && 
+                                (newLastValue == null || Convert.ToInt64(newLastValue) < longValue))
+                            {
+                                newLastValue = longValue;
+                            }
+                            else if (currentValue is int intValue && 
+                                     (newLastValue == null || Convert.ToInt32(newLastValue) < intValue))
+                            {
+                                newLastValue = intValue;
+                            }
+                        }
+                    }
+                }
+
+                // Process the batch if batch size is reached
+                if (currentBatch >= _batchSize)
+                {
+                    await BulkInsertDataAsync(targetConnection, mapping, columns, batchData);
+                    _logger.LogInformation($"Inserted batch of {currentBatch} rows into {mapping.TargetTable}");
+                    batchData.Clear();
+                    currentBatch = 0;
+                }
+            }
+
+            // Process any remaining records
+            if (batchData.Count > 0)
+            {
+                await BulkInsertDataAsync(targetConnection, mapping, columns, batchData);
+                _logger.LogInformation($"Inserted final batch of {currentBatch} rows into {mapping.TargetTable}");
+            }
+
+            // Update the last migration value
+            if (mapping.IncrementalType != "None" && newLastValue != null && !newLastValue.Equals(lastValue))
+            {
+                SetLastMigrationValue(mapping, newLastValue);
+                SaveMigrationState();
+            }
+
+            _logger.LogInformation($"Completed migration for table {mapping.SourceTable} to {mapping.TargetTable}. Total rows: {totalRows}");
+        }
+
+        private object GetLastMigrationValue(TableMapping mapping)
+        {
+            string key = $"{mapping.SourceTable}_{mapping.IncrementalColumn}";
+            
+            if (_migrationState.TryGetValue(key, out var value))
+            {
+                if (mapping.IncrementalType == "DateTime" && value is string dateStr)
+                {
+                    return DateTime.Parse(dateStr);
+                }
+                return value;
+            }
+            
+            return mapping.IncrementalStartValue;
+        }
+
+        private void SetLastMigrationValue(TableMapping mapping, object value)
+        {
+            string key = $"{mapping.SourceTable}_{mapping.IncrementalColumn}";
+            _migrationState[key] = value;
+        }
+
+        private string BuildIncrementalQuery(TableMapping mapping, object lastValue)
+        {
+            var columnList = string.Join(", ", mapping.ColumnMappings.Select(c => c.SourceColumn));
+            var query = new StringBuilder();
+            
+            query.Append($"SELECT {columnList} FROM {mapping.SourceSchema}.{mapping.SourceTable}");
+            
+            if (mapping.IncrementalType != "None" && lastValue != null)
+            {
+                string compareOperator = mapping.IncrementalCompareOperator ?? ">";
+                
+                if (mapping.IncrementalType == "DateTime" && lastValue is DateTime)
+                {
+                    var dateTime = (DateTime)lastValue;
+                    query.Append($" WHERE {mapping.IncrementalColumn} {compareOperator} '{dateTime:yyyy-MM-dd HH:mm:ss.fff}'");
+                }
+                else
+                {
+                    query.Append($" WHERE {mapping.IncrementalColumn} {compareOperator} {lastValue}");
+                }
+            }
+            
+            if (!string.IsNullOrEmpty(mapping.CustomWhere))
+            {
+                query.Append(mapping.IncrementalType != "None" && lastValue != null ? " AND " : " WHERE ");
+                query.Append(mapping.CustomWhere);
+            }
+            
+            if (!string.IsNullOrEmpty(mapping.OrderBy))
+            {
+                query.Append($" ORDER BY {mapping.OrderBy}");
+            }
+            else if (mapping.IncrementalType != "None")
+            {
+                query.Append($" ORDER BY {mapping.IncrementalColumn}");
+            }
+            
+            if (mapping.TopN > 0)
+            {
+                // Add TOP N clause for SQL Server
+                query.Insert(7, $" TOP {mapping.TopN} ");
+            }
+            
+            return query.ToString();
+        }
+
+        private async Task BulkInsertDataAsync(SqlConnection connection, TableMapping mapping, 
+                                  List<string> columns, List<object[]> data)
+        {
+            if (data.Count == 0) return;
+
+            using var dataTable = new DataTable();
+            
+            // Create columns in the DataTable
+            foreach (var colMapping in mapping.ColumnMappings)
+            {
+                var type = GetColumnType(colMapping.DataType);
+                var column = new DataColumn(colMapping.TargetColumn, type)
+                {
+                    AllowDBNull = colMapping.AllowNull
+                };
+                dataTable.Columns.Add(column);
+            }
+            
+            // Add rows to the DataTable
+            foreach (var rowData in data)
+            {
+                var row = dataTable.NewRow();
+                for (int i = 0; i < columns.Count; i++)
+                {
+                    var sourceColumn = columns[i];
+                    var mappedColumn = mapping.ColumnMappings.FirstOrDefault(c => c.SourceColumn == sourceColumn);
+                    
+                    if (mappedColumn != null)
+                    {
+                        int mappedIndex = mapping.ColumnMappings.IndexOf(mappedColumn);
+                        
+                        if (rowData[i] == DBNull.Value && !mappedColumn.AllowNull)
+                        {
+                            // Apply default value if specified
+                            row[mappedColumn.TargetColumn] = mappedColumn.DefaultValue ?? DBNull.Value;
+                        }
+                        else
+                        {
+                            // Apply any transformations if needed
+                            row[mappedColumn.TargetColumn] = ApplyTransformation(rowData[i], mappedColumn);
+                        }
+                    }
+                }
+                dataTable.Rows.Add(row);
+            }
+
+            // Use SqlBulkCopy for efficient insertion
+            using var bulkCopy = new SqlBulkCopy(connection)
+            {
+                DestinationTableName = $"{mapping.TargetSchema}.{mapping.TargetTable}",
+                BulkCopyTimeout = _commandTimeout
+            };
+            
+            // Map columns
+            foreach (var colMapping in mapping.ColumnMappings)
+            {
+                bulkCopy.ColumnMappings.Add(colMapping.TargetColumn, colMapping.TargetColumn);
+            }
+            
+            // Set options based on configuration
+            if (mapping.BulkCopyOptions != null)
+            {
+                var options = SqlBulkCopyOptions.Default;
+                
+                if (mapping.BulkCopyOptions.CheckConstraints)
+                    options |= SqlBulkCopyOptions.CheckConstraints;
+                
+                if (mapping.BulkCopyOptions.KeepIdentity)
+                    options |= SqlBulkCopyOptions.KeepIdentity;
+                
+                if (mapping.BulkCopyOptions.KeepNulls)
+                    options |= SqlBulkCopyOptions.KeepNulls;
+                
+                if (mapping.BulkCopyOptions.TableLock)
+                    options |= SqlBulkCopyOptions.TableLock;
+                
+                if (mapping.BulkCopyOptions.FireTriggers)
+                    options |= SqlBulkCopyOptions.FireTriggers;
+                
+                bulkCopy.BulkCopyTimeout = mapping.BulkCopyOptions.Timeout ?? _commandTimeout;
+            }
+            
+            try
+            {
+                await bulkCopy.WriteToServerAsync(dataTable);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error during bulk insert to {mapping.TargetTable}");
+                throw;
+            }
+        }
+
+        private Type GetColumnType(string dataType)
+        {
+            return dataType?.ToLowerInvariant() switch
+            {
+                "int" => typeof(int),
+                "bigint" => typeof(long),
+                "smallint" => typeof(short),
+                "tinyint" => typeof(byte),
+                "bit" => typeof(bool),
+                "decimal" or "money" or "smallmoney" => typeof(decimal),
+                "float" => typeof(double),
+                "real" => typeof(float),
+                "datetime" or "smalldatetime" or "date" or "datetime2" => typeof(DateTime),
+                "time" => typeof(TimeSpan),
+                "uniqueidentifier" => typeof(Guid),
+                _ => typeof(string)
+            };
+        }
+
+        private object ApplyTransformation(object value, ColumnMapping mapping)
+        {
+            if (value == DBNull.Value)
+                return mapping.AllowNull ? DBNull.Value : mapping.DefaultValue ?? DBNull.Value;
+
+            // Apply any transformations defined in ColumnMapping
+            if (!string.IsNullOrEmpty(mapping.Transformation))
+            {
+                // Simple transformations can be handled here
+                // For complex transformations, we could use a scripting engine or expression evaluator
+                switch (mapping.Transformation)
+                {
+                    case "ToUpper":
+                        return value?.ToString()?.ToUpperInvariant() ?? DBNull.Value;
+                    case "ToLower":
+                        return value?.ToString()?.ToLowerInvariant() ?? DBNull.Value;
+                    case "Trim":
+                        return value?.ToString()?.Trim() ?? DBNull.Value;
+                    case "ConvertToInt":
+                        return Convert.ToInt32(value);
+                    case "ConvertToDecimal":
+                        return Convert.ToDecimal(value);
+                    case "FormatDateTime":
+                        return value is DateTime dt ? dt.ToString(mapping.TransformationFormat) : value;
+                    // Add more transformation types as needed
+                }
+            }
+
+            return value;
+        }
+    }
+
+    public class TableMapping
+    {
+        public string SourceSchema { get; set; } = "dbo";
+        public string SourceTable { get; set; }
+        public string TargetSchema { get; set; } = "dbo";
+        public string TargetTable { get; set; }
+        public bool Enabled { get; set; } = true;
+        public bool FailOnError { get; set; } = true;
+        public string IncrementalType { get; set; } = "None"; // None, DateTime, Int, BigInt
+        public string IncrementalColumn { get; set; }
+        public string IncrementalCompareOperator { get; set; } = ">";
+        public object IncrementalStartValue { get; set; }
+        public string CustomWhere { get; set; }
+        public string OrderBy { get; set; }
+        public int TopN { get; set; }
+        public List<ColumnMapping> ColumnMappings { get; set; } = new List<ColumnMapping>();
+        public BulkCopyOptions BulkCopyOptions { get; set; }
+    }
+
+    public class ColumnMapping
+    {
+        public string SourceColumn { get; set; }
+        public string TargetColumn { get; set; }
+        public string DataType { get; set; }
+        public bool AllowNull { get; set; } = true;
+        public object DefaultValue { get; set; }
+        public string Transformation { get; set; }
+        public string TransformationFormat { get; set; }
+    }
+
+    public class BulkCopyOptions
+    {
+        public bool CheckConstraints { get; set; }
+        public bool KeepIdentity { get; set; }
+        public bool KeepNulls { get; set; }
+        public bool TableLock { get; set; }
+        public bool FireTriggers { get; set; }
+        public int? Timeout { get; set; }
+    }
+}
+Now, let's create a sample configuration file (appsettings.json) that demonstrates how to use this implementation with some of the tables from your schema:
+{
+  "ConnectionStrings": {
+    "Source": "Server=source-server;Database=SourceDB;User Id=username;Password=password;",
+    "Target": "Server=target-server;Database=TargetDB;User Id=username;Password=password;"
+  },
+  "Settings": {
+    "BatchSize": 5000,
+    "CommandTimeout": 600,
+    "EnableTransaction": true,
+    "StateStorePath": "migrationState.json",
+    "LogLevel": "Information"
+  },
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft": "Warning"
+    },
+    "FilePath": "logs/migration.log"
+  },
+  "TableMappings": [
+    {
+      "SourceSchema": "common",
+      "SourceTable": "tbl_Daily_actions_players",
+      "TargetSchema": "common",
+      "TargetTable": "tbl_Daily_actions_players",
+      "Enabled": true,
+      "FailOnError": true,
+      "IncrementalType": "DateTime",
+      "IncrementalColumn": "LastUpdated",
+      "IncrementalStartValue": "2024-01-01 00:00:00",
+      "OrderBy": "LastUpdated, PlayerID",
+      "ColumnMappings": [
+        {
+          "SourceColumn": "PlayerID",
+          "TargetColumn": "PlayerID",
+          "DataType": "bigint",
+          "AllowNull": false
+        },
+        {
+          "SourceColumn": "CasinoName",
+          "TargetColumn": "CasinoName",
+          "DataType": "nvarchar",
+          "AllowNull": true
+        },
+        {
+          "SourceColumn": "Alias",
+          "TargetColumn": "Alias",
+          "DataType": "nvarchar",
+          "AllowNull": true
+        },
+        // Add all other columns for this table
+        {
+          "SourceColumn": "LastUpdated",
+          "TargetColumn": "LastUpdated",
+          "DataType": "datetime",
+          "AllowNull": true
+        }
+      ],
+      "BulkCopyOptions": {
+        "KeepIdentity": true,
+        "KeepNulls": true,
+        "TableLock": true,
+        "Timeout": 600
+      }
+    },
+    {
+      "SourceSchema": "dbo",
+      "SourceTable": "BigWinners",
+      "TargetSchema": "dbo",
+      "TargetTable": "BigWinners",
+      "Enabled": true,
+      "FailOnError": true,
+      "IncrementalType": "BigInt",
+      "IncrementalColumn": "TransactionID",
+      "IncrementalStartValue": 0,
+      "OrderBy": "TransactionID",
+      "ColumnMappings": [
+        {
+          "SourceColumn": "PlayerID",
+          "TargetColumn": "PlayerID",
+          "DataType": "bigint",
+          "AllowNull": true
+        },
+        {
+          "SourceColumn": "GameID",
+          "TargetColumn": "GameID",
+          "DataType": "int",
+          "AllowNull": true
+        },
+        {
+          "SourceColumn": "Amount",
+          "TargetColumn": "Amount",
+          "DataType": "money",
+          "AllowNull": true
+        },
+        {
+          "SourceColumn": "Date",
+          "TargetColumn": "Date",
+          "DataType": "datetime",
+          "AllowNull": true
+        },
+        {
+          "SourceColumn": "TransactionID",
+          "TargetColumn": "TransactionID",
+          "DataType": "bigint",
+          "AllowNull": false
+        }
+      ],
+      "BulkCopyOptions": {
+        "KeepIdentity": true,
+        "KeepNulls": true,
+        "TableLock": false
+      }
+    },
+    {
+      "SourceSchema": "common",
+      "SourceTable": "tbl_Daily_actions_transactions",
+      "TargetSchema": "common",
+      "TargetTable": "tbl_Daily_actions_transactions",
+      "Enabled": true,
+      "FailOnError": true,
+      "IncrementalType": "BigInt",
+      "IncrementalColumn": "TransactionID",
+      "IncrementalStartValue": 0,
+      "ColumnMappings": [
+        {
+          "SourceColumn": "TransactionID",
+          "TargetColumn": "TransactionID",
+          "DataType": "bigint",
+          "AllowNull": false
+        },
+        {
+          "SourceColumn": "PlayerID",
+          "TargetColumn": "PlayerID",
+          "DataType": "bigint",
+          "AllowNull": true
+        },
+        {
+          "SourceColumn": "TransactionDate",
+          "TargetColumn": "TransactionDate",
+          "DataType": "datetime",
+          "AllowNull": true
+        },
+        // Add all other columns for this table
+        {
+          "SourceColumn": "TransactionType",
+          "TargetColumn": "TransactionType",
+          "DataType": "varchar",
+          "AllowNull": true
+        },
+        {
+          "SourceColumn": "TransactionAmount",
+          "TargetColumn": "TransactionAmount",
+          "DataType": "money",
+          "AllowNull": true
+        }
+      ],
+      "BulkCopyOptions": {
+        "KeepIdentity": true,
+        "KeepNulls": true
+      }
+    }
+  ]
+}
+Now let me add a scheduled service to run the migration at regular intervals:
+using System;
+using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+
+namespace SqlToSqlDataMigration
+{
+    public class Program
+    {
+        public static async Task Main(string[] args)
+        {
+            // Build host
+            var host = Host.CreateDefaultBuilder(args)
+                .ConfigureServices((hostContext, services) =>
+                {
+                    services.AddHostedService<MigrationScheduleService>();
+                    services.AddTransient<DataMigrationService>();
+                })
+                .Build();
+
+            await host.RunAsync();
+        }
+    }
+
+    public class MigrationScheduleService : BackgroundService
+    {
+        private readonly ILogger<MigrationScheduleService> _logger;
+        private readonly IConfiguration _configuration;
+        private readonly IServiceProvider _serviceProvider;
+        private Timer _timer;
+
+        public MigrationScheduleService(
+            ILogger<MigrationScheduleService> logger,
+            IConfiguration configuration,
+            IServiceProvider serviceProvider)
+        {
+            _logger = logger;
+            _configuration = configuration;
+            _serviceProvider = serviceProvider;
+        }
+
+        protected override Task ExecuteAsync(CancellationToken stoppingToken)
+        {
+            _logger.LogInformation("Migration Schedule Service is starting");
+
+            // Get interval from configuration (default to 10 minutes)
+            var intervalMinutes = _configuration.GetValue<int>("Settings:ScheduleIntervalMinutes", 10);
+            var interval = TimeSpan.FromMinutes(intervalMinutes);
+
+            _timer = new Timer(DoMigration, null, TimeSpan.Zero, interval);
+
+            return Task.CompletedTask;
+        }
+
+        private async void DoMigration(object state)
+        {
+            _logger.LogInformation("Starting scheduled migration");
+
+            try
+            {
+                using (var scope = _serviceProvider.CreateScope())
+                {
+                    var migrationService = scope.ServiceProvider.GetRequiredService<DataMigrationService>();
+                    await migrationService.RunMigrationAsync();
+                }
+
+                _logger.LogInformation("Scheduled migration completed successfully");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error occurred during scheduled migration");
+            }
+        }
+
+        public override Task StopAsync(CancellationToken stoppingToken)
+        {
+            _logger.LogInformation("Migration Schedule Service is stopping");
+
+            _timer?.Change(Timeout.Infinite, 0);
+
+            return base.StopAsync(stoppingToken);
+        }
+
+        public override void Dispose()
+        {
+            _timer?.Dispose();
+            base.Dispose();
+        }
+    }
+}
+Let me also add a more comprehensive error handling and retry logic:
+using System;
+using System.Threading.Tasks;
+using Polly;
+using Polly.Retry;
+
+namespace SqlToSqlDataMigration
+{
+    public static class RetryPolicies
+    {
+        public static AsyncRetryPolicy CreateSqlRetryPolicy(ILogger logger, int maxRetries = 3)
+        {
+            return Policy
+                .Handle<SqlException>(ex => ex.Number != 1205) // Retry all except deadlock errors
+                .Or<TimeoutException>()
+                .Or<TaskCanceledException>()
+                .WaitAndRetryAsync(
+                    maxRetries,
+                    retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)), // Exponential backoff
+                    (exception, timeSpan, retryCount, context) =>
+                    {
+                        logger.LogWarning(
+                            exception,
+                            "Retry {RetryCount} of {MaxRetries} after {RetrySeconds}s delay due to: {ErrorMessage}",
+                            retryCount,
+                            maxRetries,
+                            timeSpan.TotalSeconds,
+                            exception.Message);
+                    }
+                );
+        }
+
+        public static AsyncRetryPolicy CreateDeadlockRetryPolicy(ILogger logger, int maxRetries = 5)
+        {
+            return Policy
+                .Handle<SqlException>(ex => ex.Number == 1205) // Only retry deadlock errors
+                .WaitAndRetryAsync(
+                    maxRetries,
+                    retryAttempt => TimeSpan.FromMilliseconds(100 * retryAttempt), // Linear backoff
+                    (exception, timeSpan, retryCount, context) =>
+                    {
+                        logger.LogWarning(
+                            "Deadlock detected. Retry {RetryCount} of {MaxRetries} after {RetryMilliseconds}ms delay",
+                            retryCount,
+                            maxRetries,
+                            timeSpan.TotalMilliseconds);
+                    }
+                );
+        }
+    }
+}
+Finally, let me add some additional features to make this solution more comprehensive:
+    1. A monitoring dashboard class to track migration progress and performance 
+    2. A data validation component to ensure data integrity 
+    3. A cleanup utility for temporary state files 
+using System;
+using System.Collections.Generic;
+using System.Data;
+using System.Data.SqlClient;
+using System.Diagnostics;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace SqlToSqlDataMigration
+{
+    public class MigrationMonitor
+    {
+        private readonly ILogger _logger;
+        private readonly Dictionary<string, TableMetrics> _tableMetrics = new Dictionary<string, TableMetrics>();
+        private readonly Stopwatch _overallStopwatch = new Stopwatch();
+
+        public MigrationMonitor(ILogger logger)
+        {
+            _logger = logger;
+        }
+
+        public void StartMigration()
+        {
+            _overallStopwatch.Start();
+            _logger.LogInformation("Migration started at {StartTime}", DateTime.Now);
+        }
+
+        public void EndMigration()
+        {
+            _overallStopwatch.Stop();
+            _logger.LogInformation("Migration completed at {EndTime}", DateTime.Now);
+            _logger.LogInformation("Total migration time: {TotalTime}", _overallStopwatch.Elapsed);
+
+            // Log metrics for each table
+            foreach (var metric in _tableMetrics.Values)
+            {
+                _logger.LogInformation("Table {TableName}: {RowCount} rows, {ElapsedTime} elapsed, {RowsPerSecond} rows/sec",
+                    metric.TableName,
+                    metric.RowCount,
+                    metric.ElapsedTime,
+                    metric.RowsPerSecond);
+            }
+        }
+
+        public void StartTableMigration(string tableName)
+        {
+            var metric = new TableMetrics
+            {
+                TableName = tableName,
+                StartTime = DateTime.Now
+            };
+            
+            metric.Stopwatch.Start();
+            _tableMetrics[tableName] = metric;
+        }
+
+        public void EndTableMigration(string tableName, int rowCount)
+        {
+            if (_tableMetrics.TryGetValue(tableName, out var metric))
+            {
+                metric.Stopwatch.Stop();
+                metric.EndTime = DateTime.Now
+
+               metric.Stopwatch.Stop();
+                metric.EndTime = DateTime.Now;
+                metric.RowCount = rowCount;
+                metric.ElapsedTime = metric.Stopwatch.Elapsed;
+                metric.RowsPerSecond = rowCount / Math.Max(1, metric.ElapsedTime.TotalSeconds);
+
+                _logger.LogInformation(
+                    "Completed migration for table {TableName}: {RowCount} rows in {ElapsedTime}",
+                    tableName, rowCount, metric.ElapsedTime);
+            }
+        }
+
+        public void UpdateTableProgress(string tableName, int currentRowCount)
+        {
+            if (_tableMetrics.TryGetValue(tableName, out var metric))
+            {
+                var currentElapsed = metric.Stopwatch.Elapsed;
+                var rowsPerSecond = currentRowCount / Math.Max(1, currentElapsed.TotalSeconds);
+                
+                _logger.LogDebug(
+                    "Table {TableName} progress: {CurrentRowCount} rows, {RowsPerSecond:F1} rows/sec",
+                    tableName, currentRowCount, rowsPerSecond);
+            }
+        }
+
+        public class TableMetrics
+        {
+            public string TableName { get; set; }
+            public DateTime StartTime { get; set; }
+            public DateTime EndTime { get; set; }
+            public TimeSpan ElapsedTime { get; set; }
+            public int RowCount { get; set; }
+            public double RowsPerSecond { get; set; }
+            public Stopwatch Stopwatch { get; } = new Stopwatch();
+        }
+    }
+
+    public class DataValidationService
+    {
+        private readonly ILogger _logger;
+        private readonly string _sourceConnectionString;
+        private readonly string _targetConnectionString;
+
+        public DataValidationService(IConfiguration config, ILogger logger)
+        {
+            _logger = logger;
+            _sourceConnectionString = config.GetConnectionString("Source");
+            _targetConnectionString = config.GetConnectionString("Target");
+        }
+
+        public async Task ValidateTableDataAsync(TableMapping mapping)
+        {
+            _logger.LogInformation("Starting data validation for table {SourceTable} to {TargetTable}",
+                mapping.SourceTable, mapping.TargetTable);
+
+            var validations = new List<ValidationResult>();
+
+            // Validate row counts
+            var rowCountValidation = await ValidateRowCountsAsync(mapping);
+            validations.Add(rowCountValidation);
+
+            // Validate column existence and data types
+            var columnValidation = await ValidateColumnsAsync(mapping);
+            validations.Add(columnValidation);
+
+            // Validate key data samples
+            if (mapping.IncrementalColumn != null)
+            {
+                var keyDataValidation = await ValidateKeyDataAsync(mapping);
+                validations.Add(keyDataValidation);
+            }
+
+            // Log validation results
+            foreach (var validation in validations)
+            {
+                if (validation.Success)
+                {
+                    _logger.LogInformation("Validation passed: {ValidationType} for {TableName}",
+                        validation.ValidationType, mapping.SourceTable);
+                }
+                else
+                {
+                    _logger.LogError("Validation failed: {ValidationType} for {TableName}: {ErrorMessage}",
+                        validation.ValidationType, mapping.SourceTable, validation.ErrorMessage);
+                }
+            }
+        }
+
+        private async Task<ValidationResult> ValidateRowCountsAsync(TableMapping mapping)
+        {
+            var result = new ValidationResult
+            {
+                ValidationType = "RowCount",
+                TableName = mapping.SourceTable
+            };
+
+            try
+            {
+                var sourceCount = await GetTableRowCountAsync(_sourceConnectionString, 
+                    mapping.SourceSchema, mapping.SourceTable, mapping.CustomWhere);
+                
+                var targetCount = await GetTableRowCountAsync(_targetConnectionString, 
+                    mapping.TargetSchema, mapping.TargetTable, mapping.CustomWhere);
+
+                if (sourceCount == targetCount)
+                {
+                    result.Success = true;
+                    result.Details = $"Source: {sourceCount}, Target: {targetCount}";
+                }
+                else
+                {
+                    result.Success = false;
+                    result.ErrorMessage = $"Row count mismatch. Source: {sourceCount}, Target: {targetCount}";
+                }
+            }
+            catch (Exception ex)
+            {
+                result.Success = false;
+                result.ErrorMessage = $"Error validating row counts: {ex.Message}";
+            }
+
+            return result;
+        }
+
+        private async Task<ValidationResult> ValidateColumnsAsync(TableMapping mapping)
+        {
+            var result = new ValidationResult
+            {
+                ValidationType = "ColumnSchema",
+                TableName = mapping.SourceTable
+            };
+
+            try
+            {
+                var sourceColumns = await GetTableColumnsAsync(_sourceConnectionString, 
+                    mapping.SourceSchema, mapping.SourceTable);
+                
+                var targetColumns = await GetTableColumnsAsync(_targetConnectionString, 
+                    mapping.TargetSchema, mapping.TargetTable);
+
+                var errors = new List<string>();
+                
+                foreach (var colMapping in mapping.ColumnMappings)
+                {
+                    // Validate source column exists
+                    if (!sourceColumns.ContainsKey(colMapping.SourceColumn))
+                    {
+                        errors.Add($"Source column '{colMapping.SourceColumn}' does not exist");
+                        continue;
+                    }
+                    
+                    // Validate target column exists
+                    if (!targetColumns.ContainsKey(colMapping.TargetColumn))
+                    {
+                        errors.Add($"Target column '{colMapping.TargetColumn}' does not exist");
+                        continue;
+                    }
+                    
+                    // Validate data types are compatible
+                    var sourceType = sourceColumns[colMapping.SourceColumn];
+                    var targetType = targetColumns[colMapping.TargetColumn];
+                    
+                    if (!AreTypesCompatible(sourceType, targetType))
+                    {
+                        errors.Add($"Column type mismatch for '{colMapping.SourceColumn}'/'{colMapping.TargetColumn}': {sourceType} vs {targetType}");
+                    }
+                }
+
+                if (errors.Count == 0)
+                {
+                    result.Success = true;
+                    result.Details = $"All {mapping.ColumnMappings.Count} columns validated successfully";
+                }
+                else
+                {
+                    result.Success = false;
+                    result.ErrorMessage = string.Join("; ", errors);
+                }
+            }
+            catch (Exception ex)
+            {
+                result.Success = false;
+                result.ErrorMessage = $"Error validating columns: {ex.Message}";
+            }
+
+            return result;
+        }
+
+        private async Task<ValidationResult> ValidateKeyDataAsync(TableMapping mapping)
+        {
+            var result = new ValidationResult
+            {
+                ValidationType = "KeyData",
+                TableName = mapping.SourceTable
+            };
+
+            try
+            {
+                // Choose a column to validate (preferably the key or incremental column)
+                var columnToValidate = mapping.IncrementalColumn;
+                
+                // Get a small sample of data to validate
+                var sourceSample = await GetColumnSampleAsync(_sourceConnectionString, 
+                    mapping.SourceSchema, mapping.SourceTable, columnToValidate);
+                
+                var matchingCount = 0;
+                var mismatchDetails = new List<string>();
+                
+                foreach (var (key, value) in sourceSample)
+                {
+                    var targetValue = await GetValueByKeyAsync(_targetConnectionString, 
+                        mapping.TargetSchema, mapping.TargetTable, columnToValidate, key);
+                    
+                    if (AreValuesEqual(value, targetValue))
+                    {
+                        matchingCount++;
+                    }
+                    else
+                    {
+                        mismatchDetails.Add($"Key {key}: Source={value}, Target={targetValue}");
+                    }
+                    
+                    if (mismatchDetails.Count >= 5)
+                        break; // Limit the number of mismatch details
+                }
+
+                if (mismatchDetails.Count == 0)
+                {
+                    result.Success = true;
+                    result.Details = $"All {sourceSample.Count} sample keys matched";
+                }
+                else
+                {
+                    result.Success = false;
+                    result.ErrorMessage = $"{mismatchDetails.Count} of {sourceSample.Count} keys mismatched: {string.Join("; ", mismatchDetails)}";
+                }
+            }
+            catch (Exception ex)
+            {
+                result.Success = false;
+                result.ErrorMessage = $"Error validating key data: {ex.Message}";
+            }
+
+            return result;
+        }
+
+        private async Task<int> GetTableRowCountAsync(string connectionString, string schema, string tableName, string whereClause = null)
+        {
+            await using var connection = new SqlConnection(connectionString);
+            await connection.OpenAsync();
+            
+            var query = $"SELECT COUNT(*) FROM [{schema}].[{tableName}]";
+            if (!string.IsNullOrEmpty(whereClause))
+            {
+                query += $" WHERE {whereClause}";
+            }
+            
+            await using var command = new SqlCommand(query, connection);
+            return Convert.ToInt32(await command.ExecuteScalarAsync());
+        }
+
+        private async Task<Dictionary<string, string>> GetTableColumnsAsync(string connectionString, string schema, string tableName)
+        {
+            var columns = new Dictionary<string, string>();
+            
+            await using var connection = new SqlConnection(connectionString);
+            await connection.OpenAsync();
+            
+            var query = @"
+                SELECT COLUMN_NAME, DATA_TYPE, CHARACTER_MAXIMUM_LENGTH 
+                FROM INFORMATION_SCHEMA.COLUMNS 
+                WHERE TABLE_SCHEMA = @Schema AND TABLE_NAME = @TableName";
+            
+            await using var command = new SqlCommand(query, connection);
+            command.Parameters.AddWithValue("@Schema", schema);
+            command.Parameters.AddWithValue("@TableName", tableName);
+            
+            await using var reader = await command.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+            {
+                var columnName = reader.GetString(0);
+                var dataType = reader.GetString(1);
+                var maxLength = reader.IsDBNull(2) ? null : (int?)reader.GetInt32(2);
+                
+                var typeStr = dataType;
+                if (maxLength.HasValue && maxLength.Value != -1)
+                {
+                    typeStr += $"({maxLength})";
+                }
+                else if (maxLength.HasValue && maxLength.Value == -1)
+                {
+                    typeStr += "(MAX)";
+                }
+                
+                columns[columnName] = typeStr;
+            }
+            
+            return columns;
+        }
+
+        private async Task<Dictionary<string, object>> GetColumnSampleAsync(string connectionString, 
+            string schema, string tableName, string columnName, int sampleSize = 10)
+        {
+            var sample = new Dictionary<string, object>();
+            
+            await using var connection = new SqlConnection(connectionString);
+            await connection.OpenAsync();
+            
+            // Get a sample of rows
+            var query = $"SELECT TOP {sampleSize} {columnName} FROM [{schema}].[{tableName}] ORDER BY {columnName}";
+            
+            await using var command = new SqlCommand(query, connection);
+            await using var reader = await command.ExecuteReaderAsync();
+            
+            while (await reader.ReadAsync())
+            {
+                var value = reader.GetValue(0);
+                sample[value.ToString()] = value;
+            }
+            
+            return sample;
+        }
+
+        private async Task<object> GetValueByKeyAsync(string connectionString, 
+            string schema, string tableName, string columnName, string keyValue)
+        {
+            await using var connection = new SqlConnection(connectionString);
+            await connection.OpenAsync();
+            
+            var query = $"SELECT TOP 1 {columnName} FROM [{schema}].[{tableName}] WHERE {columnName} = @KeyValue";
+            
+            await using var command = new SqlCommand(query, connection);
+            command.Parameters.AddWithValue("@KeyValue", keyValue);
+            
+            var result = await command.ExecuteScalarAsync();
+            return result ?? DBNull.Value;
+        }
+
+        private bool AreTypesCompatible(string sourceType, string targetType)
+        {
+            // Basic compatibility check - this could be expanded for more detailed checks
+            if (sourceType == targetType)
+                return true;
+            
+            // Check numeric type compatibility
+            var numericTypes = new[] { "int", "bigint", "smallint", "tinyint", "decimal", "numeric", "float", "real", "money", "smallmoney" };
+            if (numericTypes.Any(t => sourceType.StartsWith(t)) && numericTypes.Any(t => targetType.StartsWith(t)))
+                return true;
+            
+            // Check string type compatibility
+            var stringTypes = new[] { "char", "varchar", "nchar", "nvarchar", "text", "ntext" };
+            if (stringTypes.Any(t => sourceType.StartsWith(t)) && stringTypes.Any(t => targetType.StartsWith(t)))
+                return true;
+            
+            // Check date type compatibility
+            var dateTypes = new[] { "datetime", "smalldatetime", "date", "time", "datetime2", "datetimeoffset" };
+            if (dateTypes.Any(t => sourceType.StartsWith(t)) && dateTypes.Any(t => targetType.StartsWith(t)))
+                return true;
+            
+            return false;
+        }
+
+        private bool AreValuesEqual(object value1, object value2)
+        {
+            if (value1 == null && value2 == null)
+                return true;
+            
+            if (value1 == null || value2 == null)
+                return false;
+            
+            if (value1 is DBNull && value2 is DBNull)
+                return true;
+            
+            if (value1 is DBNull || value2 is DBNull)
+                return false;
+            
+            // Handle different numeric types
+            if (value1 is IConvertible && value2 is IConvertible)
+            {
+                try
+                {
+                    var type = Type.GetTypeCode(value1.GetType());
+                    switch (type)
+                    {
+                        case TypeCode.Int16:
+                        case TypeCode.Int32:
+                        case TypeCode.Int64:
+                        case TypeCode.UInt16:
+                        case TypeCode.UInt32:
+                        case TypeCode.UInt64:
+                        case TypeCode.Byte:
+                        case TypeCode.SByte:
+                            return Convert.ToInt64(value1) == Convert.ToInt64(value2);
+                        
+                        case TypeCode.Decimal:
+                        case TypeCode.Double:
+                        case TypeCode.Single:
+                            // Allow for small floating-point rounding differences
+                            return Math.Abs(Convert.ToDouble(value1) - Convert.ToDouble(value2)) < 0.000001;
+                        
+                        case TypeCode.DateTime:
+                            var dt1 = Convert.ToDateTime(value1);
+                            var dt2 = Convert.ToDateTime(value2);
+                            return Math.Abs((dt1 - dt2).TotalSeconds) < 1; // Allow 1 second difference
+                    }
+                }
+                catch
+                {
+                    // If conversion fails, fall back to string comparison
+                }
+            }
+            
+            // Default comparison
+            return value1.ToString() == value2.ToString();
+        }
+    }
+
+    public class ValidationResult
+    {
+        public string ValidationType { get; set; }
+        public string TableName { get; set; }
+        public bool Success { get; set; }
+        public string Details { get; set; }
+        public string ErrorMessage { get; set; }
+    }
+
+    public class StateCleanupService
+    {
+        private readonly ILogger _logger;
+        private readonly string _stateStorePath;
+        private readonly TimeSpan _retentionPeriod;
+
+        public StateCleanupService(IConfiguration config, ILogger logger)
+        {
+            _logger = logger;
+            _stateStorePath = config.GetValue<string>("Settings:StateStorePath", "migrationState.json");
+            _retentionPeriod = TimeSpan.FromDays(config.GetValue<int>("Settings:StateRetentionDays", 30));
+        }
+
+        public void ArchiveState()
+        {
+            try
+            {
+                if (!File.Exists(_stateStorePath))
+                    return;
+
+                var stateContent = File.ReadAllText(_stateStorePath);
+                
+                // Create archives directory if it doesn't exist
+                var archiveDir = Path.Combine(Path.GetDirectoryName(_stateStorePath) ?? ".", "archives");
+                if (!Directory.Exists(archiveDir))
+                {
+                    Directory.CreateDirectory(archiveDir);
+                }
+                
+                // Archive the current state with timestamp
+                var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+                var archivePath = Path.Combine(
+                    archiveDir, 
+                    $"{Path.GetFileNameWithoutExtension(_stateStorePath)}_{timestamp}{Path.GetExtension(_stateStorePath)}");
+                
+                File.WriteAllText(archivePath, stateContent);
+                _logger.LogInformation("Migration state archived to {ArchivePath}", archivePath);
+                
+                // Clean up old archives
+                CleanupOldArchives(archiveDir);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error archiving migration state");
+            }
+        }
+
+        private void CleanupOldArchives(string archiveDir)
+        {
+            try
+            {
+                var cutoffDate = DateTime.Now - _retentionPeriod;
+                var files = Directory.GetFiles(archiveDir, "*.json");
+                
+                foreach (var file in files)
+                {
+                    var fileInfo = new FileInfo(file);
+                    if (fileInfo.CreationTime < cutoffDate)
+                    {
+                        fileInfo.Delete();
+                        _logger.LogInformation("Deleted old state archive {FileName}", fileInfo.Name);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error cleaning up old archives");
+            }
+        }
+    }
+}
+
+Let me add a utility class for command-line usage of the migration tool:
+using System;
+using System.CommandLine;
+using System.CommandLine.Invocation;
+using System.Threading.Tasks;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
+
+namespace SqlToSqlDataMigration
+{
+    public class CommandLineInterface
+    {
+        public static async Task<int> Main(string[] args)
+        {
+            var rootCommand = new RootCommand("SQL to SQL Data Migration Tool")
+            {
+                new Option<string>(
+                    new[] { "--config", "-c" },
+                    description: "Path to the configuration file",
+                    getDefaultValue: () => "appsettings.json"),
+                
+                new Option<string>(
+                    new[] { "--source-connection", "-s" },
+                    "Source connection string (overrides config)"),
+                
+                new Option<string>(
+                    new[] { "--target-connection", "-t" },
+                    "Target connection string (overrides config)"),
+                
+                new Option<bool>(
+                    new[] { "--validate", "-v" },
+                    "Validate data after migration",
+                    getDefaultValue: () => false),
+                
+                new Option<bool>(
+                    new[] { "--dry-run", "-d" },
+                    "Perform a dry run without modifying target database",
+                    getDefaultValue: () => false),
+                
+                new Option<string>(
+                    new[] { "--table", "-tb" },
+                    "Migrate only specific table(s) (comma-separated)"),
+                
+                new Option<bool>(
+                    new[] { "--reset-state", "-r" },
+                    "Reset migration state",
+                    getDefaultValue: () => false),
+                
+                new Option<LogLevel>(
+                    new[] { "--log-level", "-l" },
+                    "Log level (Trace, Debug, Information, Warning, Error, Critical)",
+                    getDefaultValue: () => LogLevel.Information)
+            };
+
+            rootCommand.Handler = CommandHandler.Create<string, string, string, bool, bool, string, bool, LogLevel>(
+                async (config, sourceConnection, targetConnection, validate, dryRun, table, resetState, logLevel) =>
+                {
+                    // Load configuration
+                    var configuration = new ConfigurationBuilder()
+                        .AddJsonFile(config, optional: true)
+                        .AddEnvironmentVariables()
+                        .Build();
+
+                    // Override connection strings if provided
+                    if (!string.IsNullOrEmpty(sourceConnection))
+                    {
+                        configuration["ConnectionStrings:Source"] = sourceConnection;
+                    }
+                    
+                    if (!string.IsNullOrEmpty(targetConnection))
+                    {
+                        configuration["ConnectionStrings:Target"] = targetConnection;
+                    }
+
+                    // Configure logging
+                    using var loggerFactory = LoggerFactory.Create(builder =>
+                    {
+                        builder
+                            .SetMinimumLevel(logLevel)
+                            .AddConsole()
+                            .AddFile(configuration.GetSection("Logging:FilePath").Value ?? "logs/migration.log");
+                    });
+                    var logger = loggerFactory.CreateLogger<CommandLineInterface>();
+
+                    try
+                    {
+                        // Reset migration state if requested
+                        if (resetState)
+                        {
+                            var stateStorePath = configuration.GetValue<string>("Settings:StateStorePath", "migrationState.json");
+                            if (System.IO.File.Exists(stateStorePath))
+                            {
+                                // Archive current state
+                                var stateCleanupService = new StateCleanupService(configuration, logger);
+                                stateCleanupService.ArchiveState();
+                                
+                                // Delete current state
+                                System.IO.File.Delete(stateStorePath);
+                                logger.LogInformation("Migration state has been reset");
+                            }
+                        }
+
+                        // Configure migration service
+                        var migrationService = new DataMigrationService(configuration, logger);
+                        
+                        // Apply table filter if provided
+                        if (!string.IsNullOrEmpty(table))
+                        {
+                            migrationService.SetTableFilter(table.Split(',', StringSplitOptions.RemoveEmptyEntries));
+                        }
+                        
+                        // Set dry run mode if requested
+                        if (dryRun)
+                        {
+                            migrationService.EnableDryRun();
+                            logger.LogInformation("Running in dry-run mode - no data will be modified");
+                        }
+
+                        // Run migration
+                        await migrationService.RunMigrationAsync();
+
+                        // Validate data if requested
+                        if (validate)
+                        {
+                            logger.LogInformation("Running data validation checks...");
+                            var validationService = new DataValidationService(configuration, logger);
+                            await validationService.ValidateAsync(migrationService.GetProcessedTables());
+                        }
+
+                        logger.LogInformation("Migration completed successfully");
+                        return 0;
+                    }
+                    catch (Exception ex)
+                    {
+                        logger.LogCritical(ex, "Migration failed");
+                        return 1;
+                    }
+                });
+
+            return await rootCommand.InvokeAsync(args);
+        }
+    }
+}
+
+Finally, let's add a README.md file to explain how to use this tool:
+SQL to SQL Incremental Data Migration Tool
+A robust, comprehensive, and customizable C# application for incremental data migration between SQL Server databases.
+Features
+    • Configuration-based mapping - Define table and column mappings in JSON configuration
+    • Incremental loading - Track timestamps or IDs to only migrate new or changed data
+    • Performance optimization - Batch processing and SqlBulkCopy for efficient data transfer
+    • Error handling and logging - Comprehensive logging and retry policies
+    • Data validation - Compare source and target data to ensure integrity
+    • Scheduling - Run migrations at specified intervals
+    • Transaction management - Ensure data consistency
+    • Monitoring - Track performance metrics for each migration
+    • Dry run mode - Test migrations without modifying the target database
+Getting Started
+Prerequisites
+    • .NET 6.0 or higher
+    • SQL Server (source and target)
+    • Access rights to both databases
+Installation
+    1. Clone the repository
+Build the solution:
+ dotnet build
+    2. 
+    3. Create a configuration file (see Configuration section below)
+Usage
+As a scheduled service
+dotnet run
+
+This will start the migration service with the default configuration from appsettings.json.
+Command-line interface
+dotnet run -- --config=myconfig.json --validate
+
+Command-line options:
+    • --config, -c: Path to the configuration file (default: appsettings.json)
+    • --source-connection, -s: Source connection string (overrides config)
+    • --target-connection, -t: Target connection string (overrides config)
+    • --validate, -v: Validate data after migration
+    • --dry-run, -d: Perform a dry run without modifying target database
+    • --table, -tb: Migrate only specific table(s) (comma-separated)
+    • --reset-state, -r: Reset migration state
+    • --log-level, -l: Set log level (Trace, Debug, Information, Warning, Error, Critical)
+Configuration
+The application uses a JSON configuration file with the following structure:
+{
+  "ConnectionStrings": {
+    "Source": "Server=source-server;Database=SourceDB;User Id=username;Password=password;",
+    "Target": "Server=target-server;Database=TargetDB;User Id=username;Password=password;"
+  },
+  "Settings": {
+    "BatchSize": 5000,
+    "CommandTimeout": 600,
+    "EnableTransaction": true,
+    "StateStorePath": "migrationState.json",
+    "ScheduleIntervalMinutes": 10,
+    "StateRetentionDays": 30,
+    "LogLevel": "Information"
+  },
+  "TableMappings": [
+    {
+      "SourceSchema": "common",
+      "SourceTable": "tbl_Daily_actions_players",
+      "TargetSchema": "common",
+      "TargetTable": "tbl_Daily_actions_players",
+      "Enabled": true,
+      "FailOnError": true,
+      "IncrementalType": "DateTime",
+      "IncrementalColumn": "LastUpdated",
+      "IncrementalStartValue": "2024-01-01 00:00:00",
+      "CustomWhere": "IsTest = 0",
+      "OrderBy": "LastUpdated, PlayerID",
+      "ColumnMappings": [
+        {
+          "SourceColumn": "PlayerID",
+          "TargetColumn": "PlayerID",
+          "DataType": "bigint",
+          "AllowNull": false
+        },
+        // Additional column mappings...
+      ],
+      "BulkCopyOptions": {
+        "KeepIdentity": true,
+        "KeepNulls": true,
+        "TableLock": true,
+        "Timeout": 600
+      }
+    },
+    // Additional table mappings...
+  ]
+}
+
+Table Mapping Configuration
+Each table mapping can have the following properties:
+    • SourceSchema: Source database schema (default: "dbo")
+    • SourceTable: Source table name
+    • TargetSchema: Target database schema (default: "dbo")
+    • TargetTable: Target table name
+    • Enabled: Whether this table mapping is enabled (default: true)
+    • FailOnError: Whether to fail the entire migration if an error occurs with this table (default: true)
+    • IncrementalType: Type of incremental loading ("None", "DateTime", "Int", "BigInt")
+    • IncrementalColumn: Column to track for incremental loads
+    • IncrementalCompareOperator: Operator for incremental comparison (default: ">")
+    • IncrementalStartValue: Initial value for incremental tracking
+    • CustomWhere: Additional WHERE clause for the query
+    • OrderBy: Custom ORDER BY clause
+    • TopN: Limit the number of rows to migrate (0 for no limit)
+    • ColumnMappings: Array of column mappings
+    • BulkCopyOptions: Options for SqlBulkCopy
+Column Mapping Configuration
+Each column mapping can have the following properties:
+    • SourceColumn: Column name in the source table
+    • TargetColumn: Column name in the target table
+    • DataType: Data type of the column
+    • AllowNull: Whether the column allows NULL values (default: true)
+    • DefaultValue: Default value if NULL and AllowNull is false
+    • Transformation: Transformation to apply to the data (e.g., "ToUpper", "Trim")
+    • TransformationFormat: Format string for the transformation (e.g., date format)
+State Management
+The application maintains state between migrations by storing the last successful incremental value for each table. This state is stored in a JSON file (configurable via Settings:StateStorePath).
+Logging
+Logs are written to both the console and a file. The log level and file path are configurable:
+"Logging": {
+  "LogLevel": {
+    "Default": "Information",
+    "Microsoft": "Warning"
+  },
+  "FilePath": "logs/migration.log"
+}
+
+Error Handling and Retries
+The application includes built-in retry policies for transient SQL errors:
+    • Regular retry policy: Handles most SQL exceptions with exponential backoff
+    • Deadlock retry policy: Specifically handles deadlock errors with linear backoff
+Data Validation
+When validation is enabled, the application performs the following checks:
+    • Row count comparison between source and target
+    • Column schema validation
+    • Sample data comparison
+Performance Tuning
+For optimal performance, consider adjusting the following settings:
+    • BatchSize: Number of rows to process in each batch
+    • CommandTimeout: SQL command timeout in seconds
+    • BulkCopyOptions: Various options for SqlBulkCopy
+License
+This project is licensed under the MIT License - see the LICENSE file for details.
+

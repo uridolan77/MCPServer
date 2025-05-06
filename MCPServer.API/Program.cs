@@ -23,6 +23,8 @@ using MCPServer.Core.Features.Providers;
 using MCPServer.Core.Features.Rag;
 using MCPServer.Core.Features.Sessions;
 using MCPServer.Core.Features.Usage;
+using MCPServer.Core.Features.DataTransfer;
+using MCPServer.API.Features.DataTransfer;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
@@ -288,6 +290,10 @@ builder.Services.AddScoped<MCPServer.Core.Data.LlmProviderSeeder>();
 // Register DataTransfer services
 builder.Services.AddScoped<MCPServer.Core.Services.DataTransfer.DataTransferService>();
 builder.Services.AddScoped<MCPServer.Core.Services.DataTransfer.ConnectionStringHasher>();
+
+// Register our new DataTransfer feature services
+builder.Services.AddDataTransferServices(builder.Configuration);
+builder.Services.AddDataTransferApi();
 
 var app = builder.Build();
 

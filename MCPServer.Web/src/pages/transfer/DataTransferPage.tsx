@@ -5,6 +5,9 @@ import {
   Tab,
   Tabs,
   Typography,
+  Card,
+  CardContent,
+  Grid,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -12,9 +15,11 @@ import {
   Storage as StorageIcon,
   Dns as DnsIcon,
   History as HistoryIcon,
+  Schema as SchemaIcon,
 } from '@mui/icons-material';
 import { PageHeader } from '@/components';
 import { useSnackbar } from '@/hooks/useSnackbar';
+import { Link as RouterLink } from 'react-router-dom';
 import DataTransferService from '@/services/dataTransfer.service';
 import ConnectionsTable from './components/ConnectionsTable';
 import ConfigurationsTable from './components/ConfigurationsTable';
@@ -77,6 +82,9 @@ export default function DataTransferPage() {
       password?: string;
       port?: string;
     };
+    // Add direct username and password properties
+    username?: string;
+    password?: string;
     description?: string;
     isSource?: boolean;
     isDestination?: boolean;
@@ -137,21 +145,20 @@ export default function DataTransferPage() {
 
   const loadConfigurations = async () => {
     try {
-      const response = await DataTransferService.getConfigurations();
-      console.log('Configurations response:', response);
+      // The service now returns the configurations array directly
+      const configurationsArray = await DataTransferService.getConfigurations();
+      console.log('Configurations array from service:', configurationsArray);
+      console.log('Configurations array length:', configurationsArray.length);
 
-      // Check if the response has a $values property (API response format)
-      if (response && response.$values) {
-        // Ensure $values is an array
-        const configurationsArray = Array.isArray(response.$values) ? response.$values : [];
-        console.log('Configurations array:', configurationsArray);
-        setConfigurations(configurationsArray);
-        return configurationsArray;
-      } else {
-        console.error('Unexpected response format:', response);
+      // Ensure we're setting a valid array to the state
+      if (!Array.isArray(configurationsArray)) {
+        console.error('configurationsArray is not an array!', configurationsArray);
         setConfigurations([]);
         return [];
       }
+
+      setConfigurations(configurationsArray);
+      return configurationsArray;
     } catch (error) {
       console.error('Error loading configurations:', error);
       showSnackbar('Error loading configurations', 'error');
@@ -161,21 +168,20 @@ export default function DataTransferPage() {
 
   const loadConnections = async () => {
     try {
-      const response = await DataTransferService.getConnections();
-      console.log('Connections response:', response);
+      // The service now returns the connections array directly
+      const connectionsArray = await DataTransferService.getConnections();
+      console.log('Connections array from service:', connectionsArray);
+      console.log('Connections array length:', connectionsArray.length);
 
-      // Check if the response has a $values property (API response format)
-      if (response && response.$values) {
-        // Ensure $values is an array
-        const connectionsArray = Array.isArray(response.$values) ? response.$values : [];
-        console.log('Connections array:', connectionsArray);
-        setConnections(connectionsArray);
-        return connectionsArray;
-      } else {
-        console.error('Unexpected response format:', response);
+      // Ensure we're setting a valid array to the state
+      if (!Array.isArray(connectionsArray)) {
+        console.error('connectionsArray is not an array!', connectionsArray);
         setConnections([]);
         return [];
       }
+
+      setConnections(connectionsArray);
+      return connectionsArray;
     } catch (error) {
       console.error('Error loading connections:', error);
       showSnackbar('Error loading connections', 'error');
@@ -185,21 +191,20 @@ export default function DataTransferPage() {
 
   const loadRunHistory = async (configId: number = 0) => {
     try {
-      const response = await DataTransferService.getRunHistory(configId);
-      console.log('Run history response:', response);
+      // The service now returns the run history array directly
+      const historyArray = await DataTransferService.getRunHistory(configId);
+      console.log('Run history array from service:', historyArray);
+      console.log('Run history array length:', historyArray.length);
 
-      // Check if the response has a $values property (API response format)
-      if (response && response.$values) {
-        // Ensure $values is an array
-        const historyArray = Array.isArray(response.$values) ? response.$values : [];
-        console.log('Run history array:', historyArray);
-        setRunHistory(historyArray);
-        return historyArray;
-      } else {
-        console.error('Unexpected response format:', response);
+      // Ensure we're setting a valid array to the state
+      if (!Array.isArray(historyArray)) {
+        console.error('historyArray is not an array!', historyArray);
         setRunHistory([]);
         return [];
       }
+
+      setRunHistory(historyArray);
+      return historyArray;
     } catch (error) {
       console.error('Error loading run history:', error);
       showSnackbar('Error loading run history', 'error');
@@ -270,12 +275,17 @@ export default function DataTransferPage() {
       const formattedConnection = {
         ...connectionData,
         connectionAccessLevel: connectionAccessLevelValue,
+        // Make sure username and password are included directly
+        username: connectionData.connectionDetails?.username || connectionData.username || '',
+        password: connectionData.connectionDetails?.password || connectionData.password || '',
         // Add required fields that were missing
         createdBy: "System",
         lastModifiedBy: "System",
         createdOn: connectionData.createdOn || new Date().toISOString(),
         lastModifiedOn: new Date().toISOString()
       };
+
+      console.log('Saving connection with username:', formattedConnection.username);
 
       console.log('Saving connection with data:', formattedConnection);
 
@@ -478,6 +488,61 @@ export default function DataTransferPage() {
             <Tab icon={<HistoryIcon />} iconPosition="start" label="History" />
           </Tabs>
         </Box>
+
+        {/* Tools Cards - Added before tab panels */}
+        {activeTab === 0 && (
+          <Box sx={{ p: 2 }}>
+            <Grid container spacing={2}>
+              <Grid item xs={12} md={6} lg={4}>
+                <Card variant="outlined">
+                  <CardContent>
+                    <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                      <SchemaIcon color="primary" sx={{ mr: 1 }} />
+                      <Typography variant="h6" component="h3">
+                        Database Schema Mapper
+                      </Typography>
+                    </Box>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                      Map database schemas, select tables and columns, and generate schema metadata JSON for data transfer.
+                    </Typography>
+                    <Button
+                      variant="outlined"
+                      component={RouterLink}
+                      to="/transfer/schema-mapper"
+                      fullWidth
+                    >
+                      Open Schema Mapper
+                    </Button>
+                  </CardContent>
+                </Card>
+              </Grid>
+
+              <Grid item xs={12} md={6} lg={4}>
+                <Card variant="outlined">
+                  <CardContent>
+                    <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                      <AddIcon color="primary" sx={{ mr: 1 }} />
+                      <Typography variant="h6" component="h3">
+                        New Configuration
+                      </Typography>
+                    </Box>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                      Create a new data transfer configuration between source and destination databases.
+                    </Typography>
+                    <Button
+                      variant="contained"
+                      startIcon={<AddIcon />}
+                      onClick={() => handleOpenConfigDialog()}
+                      fullWidth
+                    >
+                      New Configuration
+                    </Button>
+                  </CardContent>
+                </Card>
+              </Grid>
+            </Grid>
+          </Box>
+        )}
 
         {/* Configurations Tab */}
         <TabPanel value={activeTab} index={0}>

@@ -1123,5 +1123,271 @@ namespace MCPServer.API.Controllers
                 });
             }
         }
+
+        [HttpPost("connections/schema")]
+        public async Task<IActionResult> GetDatabaseSchema([FromBody] ConnectionDto connection)
+        {
+            // Declare connectionStringToTest at the method level so it's available in catch blocks
+            string connectionStringToTest = string.Empty;
+
+            try
+            {
+                if (connection == null)
+                {
+                    return BadRequest("Connection data is required");
+                }
+
+                connectionStringToTest = connection.ConnectionString;
+
+                // If this is an existing connection with a hashed connection string, get the original from the database
+                if (connection.ConnectionId > 0 &&
+                    (string.IsNullOrWhiteSpace(connectionStringToTest) ||
+                     connectionStringToTest.Contains("********") ||
+                     connectionStringToTest.StartsWith("HASHED:")))
+                {
+                    _logger.LogInformation("Fetching schema for existing connection ID {ConnectionId}. Retrieving original connection string from database.", connection.ConnectionId);
+
+                    // Get the connection from the database
+                    var existingConnection = await _dataTransferService.GetConnectionAsync(_connectionString, connection.ConnectionId);
+                    if (existingConnection != null)
+                    {
+                        // Get the connection string and ensure it's usable (not hashed)
+                        string originalConnectionString = existingConnection.ConnectionString;
+
+                        // Check if the connection string is hashed
+                        bool isHashed = _connectionStringHasher.IsConnectionStringHashed(originalConnectionString);
+                        _logger.LogInformation("Connection string for ID {ConnectionId} is hashed: {IsHashed}", connection.ConnectionId, isHashed);
+
+                        // Use the ConnectionStringHasher to prepare the connection string for use
+                        connectionStringToTest = _connectionStringHasher.PrepareConnectionStringForUse(originalConnectionString);
+
+                        // Check if override parameters are provided in the connection string
+                        var overrideServerMatch = Regex.Match(connection.ConnectionString, @"OverrideServer=([^;]+)", RegexOptions.IgnoreCase);
+                        var overrideDatabaseMatch = Regex.Match(connection.ConnectionString, @"OverrideDatabase=([^;]+)", RegexOptions.IgnoreCase);
+                        var overrideUsernameMatch = Regex.Match(connection.ConnectionString, @"OverrideUsername=([^;]+)", RegexOptions.IgnoreCase);
+                        var overridePasswordMatch = Regex.Match(connection.ConnectionString, @"OverridePassword=([^;]+)", RegexOptions.IgnoreCase);
+                        
+                        // If override parameters are provided, modify the connection string
+                        if (overrideServerMatch.Success || overrideDatabaseMatch.Success || 
+                            overrideUsernameMatch.Success || overridePasswordMatch.Success) 
+                        {
+                            _logger.LogInformation("Override parameters detected in connection string");
+                            
+                            var connectionStringBuilder = new SqlConnectionStringBuilder(connectionStringToTest);
+                            
+                            if (overrideServerMatch.Success) {
+                                string newServer = overrideServerMatch.Groups[1].Value;
+                                _logger.LogInformation("Overriding server with: {Server}", newServer);
+                                connectionStringBuilder.DataSource = newServer;
+                            }
+                            
+                            if (overrideDatabaseMatch.Success) {
+                                string newDatabase = overrideDatabaseMatch.Groups[1].Value;
+                                _logger.LogInformation("Overriding database with: {Database}", newDatabase);
+                                connectionStringBuilder.InitialCatalog = newDatabase;
+                            }
+
+                            if (overrideUsernameMatch.Success) {
+                                string newUsername = overrideUsernameMatch.Groups[1].Value;
+                                _logger.LogInformation("Overriding username with: {Username}", newUsername);
+                                connectionStringBuilder.UserID = newUsername;
+                            }
+
+                            if (overridePasswordMatch.Success) {
+                                string newPassword = overridePasswordMatch.Groups[1].Value;
+                                _logger.LogInformation("Overriding password with: [REDACTED]");
+                                connectionStringBuilder.Password = newPassword;
+                            }
+                            
+                            connectionStringToTest = connectionStringBuilder.ConnectionString;
+                        }
+                    }
+                    else
+                    {
+                        _logger.LogWarning("Could not find connection with ID {ConnectionId} in the database", connection.ConnectionId);
+                        return BadRequest($"Connection with ID {connection.ConnectionId} not found");
+                    }
+                }
+
+                if (string.IsNullOrWhiteSpace(connectionStringToTest))
+                {
+                    return BadRequest("Connection string is required");
+                }
+
+                // Log the connection string (without sensitive info) for debugging
+                string server = GetServerFromConnectionString(connectionStringToTest);
+                string database = GetDatabaseFromConnectionString(connectionStringToTest);
+                _logger.LogInformation("Fetching schema from database server: {Server}, database: {Database}", server, database);
+
+                // Use the connection string to connect to the database
+                using var sqlConnection = new SqlConnection(connectionStringToTest);
+                await sqlConnection.OpenAsync();
+
+                _logger.LogInformation("Connection opened successfully to database: {Database}", sqlConnection.Database);
+
+                // Get the database schema information
+                var schema = new List<Dictionary<string, object>>();
+
+                // 1. Get tables and views
+                string tablesSql = @"
+                    SELECT 
+                        t.TABLE_SCHEMA AS [Schema], 
+                        t.TABLE_NAME AS [Name], 
+                        t.TABLE_TYPE AS [Type],
+                        (
+                            SELECT COUNT(*) 
+                            FROM INFORMATION_SCHEMA.COLUMNS c 
+                            WHERE c.TABLE_SCHEMA = t.TABLE_SCHEMA AND c.TABLE_NAME = t.TABLE_NAME
+                        ) AS [ColumnCount]
+                    FROM 
+                        INFORMATION_SCHEMA.TABLES t
+                    ORDER BY 
+                        t.TABLE_SCHEMA, t.TABLE_NAME";
+
+                using (var tablesCmd = new SqlCommand(tablesSql, sqlConnection))
+                {
+                    using var reader = await tablesCmd.ExecuteReaderAsync();
+                    while (await reader.ReadAsync())
+                    {
+                        var tableInfo = new Dictionary<string, object>
+                        {
+                            ["schema"] = reader.GetString(0),
+                            ["name"] = reader.GetString(1),
+                            ["type"] = reader.GetString(2) == "BASE TABLE" ? "Table" : "View",
+                            ["columnCount"] = reader.GetInt32(3),
+                            ["columns"] = new List<Dictionary<string, object>>() // Will be populated later
+                        };
+                        schema.Add(tableInfo);
+                    }
+                }
+
+                // 2. For each table/view, get column information
+                foreach (var tableInfo in schema)
+                {
+                    string schemaName = (string)tableInfo["schema"];
+                    string tableName = (string)tableInfo["name"];
+
+                    string columnsSql = @"
+                        SELECT 
+                            COLUMN_NAME AS [Name],
+                            DATA_TYPE AS [DataType],
+                            CASE WHEN IS_NULLABLE = 'YES' THEN 1 ELSE 0 END AS [IsNullable],
+                            CASE WHEN COLUMNPROPERTY(object_id(TABLE_SCHEMA + '.' + TABLE_NAME), COLUMN_NAME, 'IsIdentity') = 1 THEN 1 ELSE 0 END AS [IsIdentity],
+                            CHARACTER_MAXIMUM_LENGTH AS [MaxLength],
+                            COLUMN_DEFAULT AS [DefaultValue],
+                            ORDINAL_POSITION AS [OrdinalPosition]
+                        FROM 
+                            INFORMATION_SCHEMA.COLUMNS
+                        WHERE 
+                            TABLE_SCHEMA = @schemaName AND TABLE_NAME = @tableName
+                        ORDER BY 
+                            ORDINAL_POSITION";
+
+                    using var columnsCmd = new SqlCommand(columnsSql, sqlConnection);
+                    columnsCmd.Parameters.AddWithValue("@schemaName", schemaName);
+                    columnsCmd.Parameters.AddWithValue("@tableName", tableName);
+
+                    var columns = new List<Dictionary<string, object>>();
+                    using (var reader = await columnsCmd.ExecuteReaderAsync())
+                    {
+                        while (await reader.ReadAsync())
+                        {
+                            var columnInfo = new Dictionary<string, object>
+                            {
+                                ["name"] = reader.GetString(0),
+                                ["dataType"] = reader.GetString(1),
+                                ["isNullable"] = reader.GetInt32(2) == 1,
+                                ["isIdentity"] = reader.GetInt32(3) == 1,
+                                ["maxLength"] = reader.IsDBNull(4) ? null : reader.GetInt32(4),
+                                ["defaultValue"] = reader.IsDBNull(5) ? null : reader.GetString(5),
+                                ["ordinalPosition"] = reader.GetInt32(6)
+                            };
+                            columns.Add(columnInfo);
+                        }
+                    }
+
+                    tableInfo["columns"] = columns;
+                }
+
+                // 3. Get primary keys for tables
+                foreach (var tableInfo in schema.Where(t => (string)t["type"] == "Table"))
+                {
+                    string schemaName = (string)tableInfo["schema"];
+                    string tableName = (string)tableInfo["name"];
+
+                    string pkSql = @"
+                        SELECT 
+                            COL_NAME(ic.object_id, ic.column_id) AS [ColumnName],
+                            ic.key_ordinal AS [KeyOrdinal]
+                        FROM 
+                            sys.indexes i
+                            INNER JOIN sys.index_columns ic ON i.object_id = ic.object_id AND i.index_id = ic.index_id
+                            INNER JOIN sys.objects o ON i.object_id = o.object_id
+                            INNER JOIN sys.schemas s ON o.schema_id = s.schema_id
+                        WHERE 
+                            i.is_primary_key = 1
+                            AND s.name = @schemaName
+                            AND o.name = @tableName
+                        ORDER BY 
+                            ic.key_ordinal";
+
+                    using var pkCmd = new SqlCommand(pkSql, sqlConnection);
+                    pkCmd.Parameters.AddWithValue("@schemaName", schemaName);
+                    pkCmd.Parameters.AddWithValue("@tableName", tableName);
+
+                    var primaryKeys = new List<string>();
+                    using (var reader = await pkCmd.ExecuteReaderAsync())
+                    {
+                        while (await reader.ReadAsync())
+                        {
+                            primaryKeys.Add(reader.GetString(0));
+                        }
+                    }
+
+                    // Mark primary key columns in the column list
+                    var columns = (List<Dictionary<string, object>>)tableInfo["columns"];
+                    foreach (var column in columns)
+                    {
+                        column["isPrimaryKey"] = primaryKeys.Contains((string)column["name"]);
+                    }
+
+                    tableInfo["primaryKey"] = primaryKeys;
+                }
+
+                // Return the schema information
+                return Ok(new {
+                    success = true,
+                    message = $"Successfully retrieved schema for {database} on {server}",
+                    server = server,
+                    database = database,
+                    schema = schema
+                });
+            }
+            catch (SqlException sqlEx)
+            {
+                _logger.LogError(sqlEx, "SQL Error fetching database schema. Error code: {ErrorCode}, State: {State}, Server: {Server}",
+                    sqlEx.Number, sqlEx.State, sqlEx.Server);
+
+                return StatusCode(500, new {
+                    success = false,
+                    message = "Failed to fetch database schema: " + GetUserFriendlyErrorMessage(sqlEx),
+                    error = sqlEx.Message,
+                    errorCode = sqlEx.Number,
+                    state = sqlEx.State,
+                    server = sqlEx.Server
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error fetching database schema");
+                
+                return StatusCode(500, new {
+                    success = false,
+                    message = "Failed to fetch database schema",
+                    error = ex.Message,
+                    exceptionType = ex.GetType().Name
+                });
+            }
+        }
     }
 }
