@@ -216,12 +216,20 @@ export default function ConfigurationDialog({ open, configuration, connections, 
   };
 
   const handleSubmit = () => {
-    // Prepare data for save
+    // Find the full connection objects from the connections array
+    const sourceConnection = connections.find(c => c.connectionId.toString() === formData.sourceConnection.connectionId.toString());
+    const destinationConnection = connections.find(c => c.connectionId.toString() === formData.destinationConnection.connectionId.toString());
+
+    if (!sourceConnection || !destinationConnection) {
+      alert('Please select valid source and destination connections');
+      return;
+    }
+
+    // Prepare data for save with full connection objects
     const configToSave = {
       ...formData,
-      // Ensure the connection IDs are passed correctly for backend
-      sourceConnectionId: formData.sourceConnection.connectionId,
-      destinationConnectionId: formData.destinationConnection.connectionId
+      sourceConnection: sourceConnection,
+      destinationConnection: destinationConnection
     };
 
     onSave(configToSave);

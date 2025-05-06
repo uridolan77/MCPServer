@@ -13,7 +13,7 @@ interface DecodedToken {
 
 // Create a customized axios instance
 const apiClient: AxiosInstance = axios.create({
-  baseURL: API_BASE_URL,
+  baseURL: `${API_BASE_URL}/api`, // Add /api prefix to base URL
   timeout: 30000, // 30 seconds
   headers: {
     'Content-Type': 'application/json',
@@ -29,7 +29,7 @@ apiClient.interceptors.request.use(
     }
 
     if (import.meta.env.DEV) {
-      console.log(`API Request: ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`, 
+      console.log(`API Request: ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`,
         config.params ? `params: ${JSON.stringify(config.params)}` : '',
         config.data ? `data: ${JSON.stringify(config.data)}` : '');
     }
@@ -45,13 +45,13 @@ apiClient.interceptors.request.use(
 apiClient.interceptors.response.use(
   (response: AxiosResponse) => {
     if (import.meta.env.DEV) {
-      console.log(`API Response from ${response.config.url}:`, 
+      console.log(`API Response from ${response.config.url}:`,
         response.data ? JSON.stringify(response.data).substring(0, 1000) + '...' : 'No data');
 
       // Special debugging for chat logs endpoint
       if (response.config.url?.includes('chat-usage/logs') || response.config.url?.includes('usage/logs')) {
         console.log('DETAILED CHAT LOGS RESPONSE:', response.data);
-        
+
         // Check different data structures
         if (response.data && response.data.data && response.data.data.$values) {
           console.log('Found nested $values array with', response.data.data.$values.length, 'items');
@@ -125,7 +125,7 @@ apiClient.interceptors.response.use(
         return Promise.reject(refreshError);
       }
     }
-    
+
     // For 404 errors, log a clearer message to help with debugging
     if (error.response?.status === 404) {
       console.warn(`Resource not found (404): ${error.config?.url}`);

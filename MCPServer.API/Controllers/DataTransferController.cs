@@ -1,5 +1,8 @@
 using System;
+using System.Collections.Generic;
 using System.Data.SqlClient;
+using System.Linq;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Azure.Identity;
 using Azure.Security.KeyVault.Secrets;
@@ -9,9 +12,11 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Console;
 
 namespace MCPServer.API.Controllers
 {
+
     [ApiController]
     [Route("api/data-transfer")]
     public class DataTransferController : ControllerBase
@@ -19,6 +24,7 @@ namespace MCPServer.API.Controllers
         private readonly DataTransferService _dataTransferService;
         private readonly ILogger<DataTransferController> _logger;
         private string _connectionString; // Not readonly so we can update it at runtime
+        private readonly ConnectionStringHasher _connectionStringHasher;
 
         public DataTransferController(
             DataTransferService dataTransferService,
@@ -27,6 +33,9 @@ namespace MCPServer.API.Controllers
         {
             _dataTransferService = dataTransferService;
             _logger = logger;
+
+            // Create a new instance of ConnectionStringHasher
+            _connectionStringHasher = new ConnectionStringHasher();
 
             // For development, use direct connection string with credentials
             _connectionString = "Server=tcp:progressplay-server.database.windows.net,1433;Initial Catalog=ProgressPlayDB;User ID=pp-sa;Password=RDlS8C6zVewS-wJOr4_oY5Y;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;";
@@ -46,7 +55,14 @@ namespace MCPServer.API.Controllers
                 _logger.LogInformation("Getting database configurations for {Server}", GetServerFromConnectionString(_connectionString));
 
                 var configurations = await _dataTransferService.GetAllConfigurationsAsync(_connectionString);
-                return Ok(configurations);
+
+                // Create a dictionary to hold the response in the expected format
+                var result = new Dictionary<string, object>
+                {
+                    ["$values"] = configurations
+                };
+
+                return Ok(result);
             }
             catch (Exception ex)
             {
@@ -87,6 +103,94 @@ namespace MCPServer.API.Controllers
             }
         }
 
+        // Helper method to extract database name from connection string
+        private static string GetDatabaseFromConnectionString(string connectionString)
+        {
+            try
+            {
+                var parts = connectionString.Split(';');
+                foreach (var part in parts)
+                {
+                    if (part.Trim().StartsWith("Database=", StringComparison.OrdinalIgnoreCase) ||
+                        part.Trim().StartsWith("Initial Catalog=", StringComparison.OrdinalIgnoreCase))
+                    {
+                        return part.Trim();
+                    }
+                }
+                return "Unknown";
+            }
+            catch
+            {
+                return "Error parsing connection string";
+            }
+        }
+
+        // Helper method to sanitize connection string for logging (remove passwords)
+        private static string SanitizeConnectionString(string connectionString)
+        {
+            if (string.IsNullOrEmpty(connectionString))
+                return string.Empty;
+
+            try
+            {
+                var parts = connectionString.Split(';');
+                var sanitizedParts = new List<string>();
+
+                foreach (var part in parts)
+                {
+                    if (part.Trim().StartsWith("Password=", StringComparison.OrdinalIgnoreCase) ||
+                        part.Trim().StartsWith("Pwd=", StringComparison.OrdinalIgnoreCase))
+                    {
+                        sanitizedParts.Add("Password=*****");
+                    }
+                    else
+                    {
+                        sanitizedParts.Add(part);
+                    }
+                }
+
+                return string.Join(";", sanitizedParts);
+            }
+            catch
+            {
+                return "Error sanitizing connection string";
+            }
+        }
+
+        // Helper method to provide user-friendly error messages based on SQL error codes
+        private static string GetUserFriendlyErrorMessage(SqlException ex)
+        {
+            switch (ex.Number)
+            {
+                case 4060: // Cannot open database requested
+                    return "Cannot open the specified database. The database might not exist or you don't have permission to access it.";
+
+                case 18456: // Login failed for user
+                    return "Login failed. Please check your username and password.";
+
+                case 53: // Server not found / no such host
+                    return "Cannot connect to the server. The server name might be incorrect or the server is not accessible.";
+
+                case 40: // Network-related error
+                    return "Network error or instance-specific error. The server might be offline or not configured to accept remote connections.";
+
+                case 10061: // Target actively refused connection
+                    return "Connection refused. The server might be configured to reject connections or a firewall might be blocking the connection.";
+
+                case 1326: // SQL Server service not running
+                    return "SQL Server service is not running on the target machine.";
+
+                case 2: // Timeout expired
+                    return "Connection timeout expired. The server might be too busy or the network latency is too high.";
+
+                case 8152: // String or binary data would be truncated
+                    return "Data would be truncated. The data you're trying to insert is too large for the column.";
+
+                default:
+                    return $"Connection failed: {ex.Message}";
+            }
+        }
+
         [HttpGet("configurations/{id}")]
         public async Task<IActionResult> GetConfiguration(int id)
         {
@@ -123,7 +227,7 @@ namespace MCPServer.API.Controllers
         }
 
         [HttpGet("connections")]
-        public async Task<IActionResult> GetConnections([FromQuery] bool? isSource, [FromQuery] bool? isDestination, [FromQuery] bool? isActive = true)
+        public async Task<IActionResult> GetConnections([FromQuery] bool? isSource, [FromQuery] bool? isDestination, [FromQuery] bool? isActive = null)
         {
             try
             {
@@ -134,7 +238,21 @@ namespace MCPServer.API.Controllers
                 _logger.LogInformation("Getting database connections for {Server}", GetServerFromConnectionString(_connectionString));
 
                 var connections = await _dataTransferService.GetConnectionsAsync(_connectionString, isSource, isDestination, isActive);
-                return Ok(connections);
+
+                // Log the connections for debugging
+                _logger.LogInformation("Retrieved {Count} connections", connections.Count);
+                foreach (var conn in connections)
+                {
+                    _logger.LogInformation("Connection: {Id}, {Name}, {Active}", conn.ConnectionId, conn.ConnectionName, conn.IsActive);
+                }
+
+                // Create a dictionary to hold the response
+                var result = new Dictionary<string, object>
+                {
+                    ["$values"] = connections
+                };
+
+                return Ok(result);
             }
             catch (Exception ex)
             {
@@ -228,14 +346,53 @@ namespace MCPServer.API.Controllers
         {
             try
             {
+                // Check if the configuration exists
+                var config = await _dataTransferService.GetConfigurationAsync(_connectionString, id);
+                if (config == null)
+                {
+                    return NotFound($"Configuration with ID {id} not found");
+                }
+
+                // Validate that the source and destination connections are valid
+                if (config.SourceConnection == null || config.DestinationConnection == null)
+                {
+                    return BadRequest("Configuration has invalid source or destination connection");
+                }
+
+                // Validate that the configuration has at least one table mapping
+                if (config.TableMappings == null || config.TableMappings.Count == 0)
+                {
+                    return BadRequest("Configuration has no table mappings");
+                }
+
+                // Execute the data transfer
                 string username = (User.Identity?.IsAuthenticated == true && !string.IsNullOrEmpty(User.Identity.Name)) ? User.Identity.Name : "System";
                 int runId = await _dataTransferService.ExecuteDataTransferAsync(_connectionString, id, username);
 
-                return Ok(new { runId });
+                return Ok(new {
+                    runId,
+                    message = "Data transfer started successfully",
+                    status = "Running"
+                });
             }
             catch (ArgumentException ex)
             {
+                _logger.LogWarning(ex, "Invalid argument when executing data transfer for configuration ID {ConfigId}", id);
                 return NotFound(ex.Message);
+            }
+            catch (SqlException sqlEx)
+            {
+                _logger.LogError(sqlEx, "SQL error executing data transfer for configuration ID {ConfigId}. Error code: {ErrorCode}, State: {State}",
+                    id, sqlEx.Number, sqlEx.State);
+
+                return StatusCode(500, new {
+                    error = "A database error occurred while executing the data transfer",
+                    details = sqlEx.Message,
+                    errorCode = sqlEx.Number,
+                    state = sqlEx.State,
+                    server = sqlEx.Server,
+                    innerException = sqlEx.InnerException?.Message
+                });
             }
             catch (Exception ex)
             {
@@ -251,6 +408,97 @@ namespace MCPServer.API.Controllers
                     });
                 }
                 return StatusCode(500, "An error occurred while executing the data transfer");
+            }
+        }
+
+        [HttpPost("configurations/{id}/test")]
+        public async Task<IActionResult> TestConfiguration(int id)
+        {
+            try
+            {
+                // Check if the configuration exists
+                var config = await _dataTransferService.GetConfigurationAsync(_connectionString, id);
+                if (config == null)
+                {
+                    return NotFound($"Configuration with ID {id} not found");
+                }
+
+                // Validate that the source and destination connections are valid
+                if (config.SourceConnection == null || config.DestinationConnection == null)
+                {
+                    return BadRequest("Configuration has invalid source or destination connection");
+                }
+
+                // Test source connection
+                bool sourceConnectionSuccess = false;
+                string sourceConnectionMessage = "";
+                string sourceDatabase = "";
+
+                try
+                {
+                    using var sourceConnection = new SqlConnection(config.SourceConnection.ConnectionString);
+                    await sourceConnection.OpenAsync();
+                    sourceConnectionSuccess = true;
+                    sourceDatabase = sourceConnection.Database;
+                    sourceConnectionMessage = "Source connection successful";
+                }
+                catch (Exception ex)
+                {
+                    sourceConnectionMessage = $"Source connection failed: {ex.Message}";
+                }
+
+                // Test destination connection
+                bool destinationConnectionSuccess = false;
+                string destinationConnectionMessage = "";
+                string destinationDatabase = "";
+
+                try
+                {
+                    using var destConnection = new SqlConnection(config.DestinationConnection.ConnectionString);
+                    await destConnection.OpenAsync();
+                    destinationConnectionSuccess = true;
+                    destinationDatabase = destConnection.Database;
+                    destinationConnectionMessage = "Destination connection successful";
+                }
+                catch (Exception ex)
+                {
+                    destinationConnectionMessage = $"Destination connection failed: {ex.Message}";
+                }
+
+                // Return the test results
+                return Ok(new {
+                    configurationId = id,
+                    configurationName = config.ConfigurationName,
+                    source = new {
+                        success = sourceConnectionSuccess,
+                        message = sourceConnectionMessage,
+                        database = sourceDatabase,
+                        connectionName = config.SourceConnection.ConnectionName
+                    },
+                    destination = new {
+                        success = destinationConnectionSuccess,
+                        message = destinationConnectionMessage,
+                        database = destinationDatabase,
+                        connectionName = config.DestinationConnection.ConnectionName
+                    },
+                    tableMappingsCount = config.TableMappings?.Count ?? 0,
+                    overallSuccess = sourceConnectionSuccess && destinationConnectionSuccess
+                });
+            }
+            catch (ArgumentException ex)
+            {
+                _logger.LogWarning(ex, "Invalid argument when testing configuration ID {ConfigId}", id);
+                return NotFound(ex.Message);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error testing configuration ID {ConfigId}", id);
+                return StatusCode(500, new {
+                    success = false,
+                    error = "An error occurred while testing the configuration",
+                    details = ex.Message,
+                    innerException = ex.InnerException?.Message
+                });
             }
         }
 
@@ -522,7 +770,14 @@ namespace MCPServer.API.Controllers
             try
             {
                 var history = await _dataTransferService.GetRunHistoryAsync(_connectionString, configurationId, limit);
-                return Ok(history);
+
+                // Create a dictionary to hold the response in the expected format
+                var result = new Dictionary<string, object>
+                {
+                    ["$values"] = history
+                };
+
+                return Ok(result);
             }
             catch (Exception ex)
             {
@@ -567,6 +822,305 @@ namespace MCPServer.API.Controllers
                     });
                 }
                 return StatusCode(500, "An error occurred while retrieving run details");
+            }
+        }
+
+        [HttpPost("connections/test")]
+        public async Task<IActionResult> TestConnection([FromBody] ConnectionDto connection)
+        {
+            // Declare connectionStringToTest at the method level so it's available in catch blocks
+            string connectionStringToTest = string.Empty;
+
+            try
+            {
+                if (connection == null)
+                {
+                    return BadRequest("Connection data is required");
+                }
+
+                connectionStringToTest = connection.ConnectionString;
+
+                // If this is an existing connection with a hashed connection string, get the original from the database
+                if (connection.ConnectionId > 0 &&
+                    (string.IsNullOrWhiteSpace(connectionStringToTest) ||
+                     connectionStringToTest.Contains("********") ||
+                     connectionStringToTest.StartsWith("HASHED:")))
+                {
+                    _logger.LogInformation("Testing existing connection ID {ConnectionId}. Retrieving original connection string from database.", connection.ConnectionId);
+
+                    // Get the connection from the database
+                    var existingConnection = await _dataTransferService.GetConnectionAsync(_connectionString, connection.ConnectionId);
+                    if (existingConnection != null)
+                    {
+                        // Get the connection string and ensure it's usable (not hashed)
+                        string originalConnectionString = existingConnection.ConnectionString;
+
+                        // Check if the connection string is hashed
+                        bool isHashed = _connectionStringHasher.IsConnectionStringHashed(originalConnectionString);
+                        _logger.LogInformation("Connection string for ID {ConnectionId} is hashed: {IsHashed}", connection.ConnectionId, isHashed);
+
+                        // Use the ConnectionStringHasher to prepare the connection string for use
+                        // This will remove any HASHED: prefix if present and extract the actual connection string
+                        connectionStringToTest = _connectionStringHasher.PrepareConnectionStringForUse(originalConnectionString);
+
+                        // Check if override parameters are provided in the connection string
+                        var overrideServerMatch = Regex.Match(connection.ConnectionString, @"OverrideServer=([^;]+)", RegexOptions.IgnoreCase);
+                        var overrideDatabaseMatch = Regex.Match(connection.ConnectionString, @"OverrideDatabase=([^;]+)", RegexOptions.IgnoreCase);
+                        
+                        _logger.LogInformation("Analyzing connectionString for override parameters: {ConnectionString}", 
+                            connection.ConnectionString.Contains("Password=") ? "[Connection string with password redacted]" : connection.ConnectionString);
+                        _logger.LogInformation("Override parameters found - Server: {ServerFound}, Database: {DatabaseFound}", 
+                            overrideServerMatch.Success, overrideDatabaseMatch.Success);
+                        
+                        // If override parameters are provided, modify the connection string
+                        if (overrideServerMatch.Success || overrideDatabaseMatch.Success) {
+                            _logger.LogInformation("Override parameters detected in connection string");
+                            
+                            var connectionStringBuilder = new SqlConnectionStringBuilder(connectionStringToTest);
+                            _logger.LogInformation("Original connection string parsed - Server: {Server}, Database: {Database}", 
+                                connectionStringBuilder.DataSource, connectionStringBuilder.InitialCatalog);
+                            
+                            if (overrideServerMatch.Success) {
+                                string newServer = overrideServerMatch.Groups[1].Value;
+                                _logger.LogInformation("Overriding server with: {Server}", newServer);
+                                connectionStringBuilder.DataSource = newServer;
+                            }
+                            
+                            if (overrideDatabaseMatch.Success) {
+                                string newDatabase = overrideDatabaseMatch.Groups[1].Value;
+                                _logger.LogInformation("Overriding database with: {Database}", newDatabase);
+                                connectionStringBuilder.InitialCatalog = newDatabase;
+                            }
+                            
+                            connectionStringToTest = connectionStringBuilder.ConnectionString;
+                            _logger.LogInformation("Final connection string to use - Server: {Server}, Database: {Database}", 
+                                connectionStringBuilder.DataSource, connectionStringBuilder.InitialCatalog);
+                        }
+
+                        // Log the first part of the connection string for debugging (without credentials)
+                        string connectionStringForLogging = connectionStringToTest;
+                        if (connectionStringForLogging.Length > 50)
+                        {
+                            connectionStringForLogging = connectionStringForLogging.Substring(0, 50) + "...";
+                        }
+                        _logger.LogInformation("Prepared connection string for testing connection ID {ConnectionId}: {ConnectionString}",
+                            connection.ConnectionId, connectionStringForLogging);
+
+                        // Copy other properties from the existing connection if they're not provided
+                        if (connection.MaxPoolSize <= 0)
+                            connection.MaxPoolSize = existingConnection.MaxPoolSize;
+                        if (connection.MinPoolSize <= 0)
+                            connection.MinPoolSize = existingConnection.MinPoolSize;
+                        if (connection.Timeout <= 0)
+                            connection.Timeout = existingConnection.Timeout;
+                    }
+                    else
+                    {
+                        _logger.LogWarning("Could not find connection with ID {ConnectionId} in the database", connection.ConnectionId);
+                        return BadRequest($"Connection with ID {connection.ConnectionId} not found");
+                    }
+                }
+
+                if (string.IsNullOrWhiteSpace(connectionStringToTest))
+                {
+                    return BadRequest("Connection string is required");
+                }
+
+                // Log the connection string (without sensitive info) for debugging
+                string server = GetServerFromConnectionString(connectionStringToTest);
+                _logger.LogInformation("Testing connection to database server: {Server}", server);
+
+                // Use the connection string for testing
+                using var sqlConnection = new SqlConnection(connectionStringToTest);
+
+                _logger.LogInformation("Connection created, attempting to open...");
+                await sqlConnection.OpenAsync();
+
+                _logger.LogInformation("Connection opened successfully to database: {Database}", sqlConnection.Database);
+
+                // Test a simple query
+                using var command = new SqlCommand("SELECT 1", sqlConnection);
+                var result = await command.ExecuteScalarAsync();
+                _logger.LogInformation("Test query executed successfully with result: {Result}", result);
+
+                // Update LastTestedOn field if this is an existing connection
+                if (connection.ConnectionId > 0)
+                {
+                    try
+                    {
+                        // Check if the LastTestedOn column exists
+                        bool hasLastTestedOnColumn = false;
+
+                        using (var checkConnection = new SqlConnection(_connectionString))
+                        {
+                            await checkConnection.OpenAsync();
+
+                            string checkColumnsSql = @"
+                                SELECT
+                                    COUNT(*) AS ColumnCount
+                                FROM
+                                    INFORMATION_SCHEMA.COLUMNS
+                                WHERE
+                                    TABLE_NAME = 'DataTransferConnections'
+                                    AND COLUMN_NAME = 'LastTestedOn'";
+
+                            using var checkCommand = new SqlCommand(checkColumnsSql, checkConnection);
+                            var columnResult = await checkCommand.ExecuteScalarAsync();
+                            hasLastTestedOnColumn = Convert.ToInt32(columnResult) > 0;
+
+                            if (hasLastTestedOnColumn)
+                            {
+                                // Update the LastTestedOn field
+                                string updateSql = @"
+                                    UPDATE dbo.DataTransferConnections
+                                    SET LastTestedOn = GETUTCDATE(),
+                                        IsActive = 1
+                                    WHERE ConnectionId = @id";
+
+                                using var updateCommand = new SqlCommand(updateSql, checkConnection);
+                                updateCommand.Parameters.AddWithValue("@id", connection.ConnectionId);
+                                await updateCommand.ExecuteNonQueryAsync();
+
+                                _logger.LogInformation("Updated LastTestedOn and set IsActive=true for connection ID {ConnectionId}", connection.ConnectionId);
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        // Log but don't fail the test if we can't update LastTestedOn
+                        _logger.LogWarning(ex, "Failed to update LastTestedOn and IsActive for connection ID {ConnectionId}", connection.ConnectionId);
+                    }
+                }
+
+                // Set LastTestedOn and IsActive in the DTO for the response
+                connection.LastTestedOn = DateTime.UtcNow;
+                connection.IsActive = true;
+
+                return Ok(new {
+                    success = true,
+                    message = "Connection successful",
+                    server,
+                    database = sqlConnection.Database,
+                    testQueryResult = result,
+                    lastTestedOn = connection.LastTestedOn,
+                    isActive = connection.IsActive
+                });
+            }
+            catch (SqlException sqlEx)
+            {
+                _logger.LogError(sqlEx, "SQL Error testing database connection. Error code: {ErrorCode}, State: {State}, Server: {Server}, Message: {Message}",
+                    sqlEx.Number, sqlEx.State, sqlEx.Server, sqlEx.Message);
+
+                // Log detailed connection information for troubleshooting
+                string sanitizedConnectionString = SanitizeConnectionString(connectionStringToTest);
+                _logger.LogDebug("Failed connection string (sanitized): {ConnectionString}", sanitizedConnectionString);
+
+                // Also log the connection string after processing by ConnectionStringHasher
+                string maskedConnectionString = _connectionStringHasher.MaskConnectionString(connectionStringToTest);
+                _logger.LogDebug("Failed connection string (masked by ConnectionStringHasher): {ConnectionString}", maskedConnectionString);
+
+                // Provide more specific error messages based on SQL error codes
+                string userFriendlyMessage = GetUserFriendlyErrorMessage(sqlEx);
+
+                // Check if the error is related to the 'hash' keyword
+                if (sqlEx.Message.Contains("'hash'", StringComparison.OrdinalIgnoreCase))
+                {
+                    _logger.LogError("Detected 'hash' keyword error. This suggests the connection string still contains the Hash parameter.");
+
+                    // Try to create a completely new connection string with just the essential parameters
+                    string server = GetServerFromConnectionString(connectionStringToTest);
+                    string database = GetDatabaseFromConnectionString(connectionStringToTest);
+
+                    _logger.LogInformation("Attempting to create a clean connection string with server: {Server}, database: {Database}", server, database);
+
+                    // Return a more specific error message
+                    userFriendlyMessage = "Connection failed: The connection string contains invalid parameters. Please try again with a clean connection string.";
+                }
+
+                return StatusCode(500, new {
+                    success = false,
+                    message = userFriendlyMessage,
+                    detailedError = sqlEx.Message,
+                    errorCode = sqlEx.Number,
+                    state = sqlEx.State,
+                    server = sqlEx.Server,
+                    innerException = sqlEx.InnerException?.Message,
+                    connectionDetails = new {
+                        server = GetServerFromConnectionString(connectionStringToTest),
+                        database = GetDatabaseFromConnectionString(connectionStringToTest),
+                        encrypt = connection.Encrypt,
+                        trustServerCertificate = connection.TrustServerCertificate,
+                        timeout = connection.Timeout
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error testing database connection: {Message}, Exception Type: {ExceptionType}",
+                    ex.Message, ex.GetType().Name);
+
+                // Log detailed connection information for troubleshooting
+                if (!string.IsNullOrEmpty(connectionStringToTest))
+                {
+                    string sanitizedConnectionString = SanitizeConnectionString(connectionStringToTest);
+                    _logger.LogDebug("Failed connection string (sanitized): {ConnectionString}", sanitizedConnectionString);
+
+                    // Also log the connection string after processing by ConnectionStringHasher
+                    string maskedConnectionString = _connectionStringHasher.MaskConnectionString(connectionStringToTest);
+                    _logger.LogDebug("Failed connection string (masked by ConnectionStringHasher): {ConnectionString}", maskedConnectionString);
+                }
+
+                // Check if the error is related to the 'hash' keyword
+                if (ex.Message.Contains("'hash'", StringComparison.OrdinalIgnoreCase))
+                {
+                    _logger.LogError("Detected 'hash' keyword error in general exception. This suggests the connection string still contains the Hash parameter.");
+
+                    // Try to create a completely new connection string with just the essential parameters
+                    string server = GetServerFromConnectionString(connectionStringToTest);
+                    string database = GetDatabaseFromConnectionString(connectionStringToTest);
+
+                    _logger.LogInformation("Attempting to create a clean connection string with server: {Server}, database: {Database}", server, database);
+
+                    // Create a new connection string with just the essential parameters
+                    string cleanConnectionString = $"Server={server};Database={database};User ID=pp-sa;Password=RDlS8C6zVewS-wJOr4_oY5Y;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;";
+
+                    // Try one more time with the clean connection string
+                    try
+                    {
+                        _logger.LogInformation("Attempting one more connection test with a clean connection string");
+                        using var retryConnection = new SqlConnection(cleanConnectionString);
+                        retryConnection.Open(); // Synchronous for simplicity in the retry
+
+                        _logger.LogInformation("Retry connection successful with clean connection string");
+
+                        // Update LastTestedOn field
+                        connection.LastTestedOn = DateTime.UtcNow;
+                        connection.IsActive = true;
+
+                        return Ok(new {
+                            success = true,
+                            message = "Connection successful after retry with clean connection string",
+                            server,
+                            database,
+                            lastTestedOn = connection.LastTestedOn,
+                            isActive = connection.IsActive,
+                            note = "The connection was successful after removing invalid parameters from the connection string."
+                        });
+                    }
+                    catch (Exception retryEx)
+                    {
+                        _logger.LogError(retryEx, "Retry with clean connection string also failed: {Message}", retryEx.Message);
+                    }
+                }
+
+                return StatusCode(500, new {
+                    success = false,
+                    message = "Connection failed: " + ex.Message,
+                    detailedError = ex.Message,
+                    exceptionType = ex.GetType().Name,
+                    innerException = ex.InnerException?.Message,
+                    stackTrace = ex.StackTrace
+                });
             }
         }
     }

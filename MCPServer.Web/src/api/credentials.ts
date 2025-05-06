@@ -19,8 +19,11 @@ export interface Provider {
   description?: string;
 }
 
-// API base URL
-const API_URL = 'http://localhost:2000/api';
+// Import the API_BASE_URL from config
+import { API_BASE_URL } from '@/config';
+
+// API base URL with /api prefix
+const API_URL = `${API_BASE_URL}/api`;
 
 // Get all credentials
 export const fetchCredentials = async (): Promise<Credential[]> => {
@@ -29,7 +32,7 @@ export const fetchCredentials = async (): Promise<Credential[]> => {
     // In the future, this will be replaced with a real API call
     // const response = await axios.get(`${API_URL}/credentials`);
     // return response.data;
-    
+
     return mockCredentials;
   } catch (error) {
     console.error('Error fetching credentials:', error);
@@ -44,7 +47,7 @@ export const fetchCredentialById = async (id: string): Promise<Credential> => {
     // In the future, this will be replaced with a real API call
     // const response = await axios.get(`${API_URL}/credentials/${id}`);
     // return response.data;
-    
+
     const credential = mockCredentials.find(cred => cred.id === id);
     if (!credential) {
       throw new Error('Credential not found');
@@ -63,7 +66,7 @@ export const fetchProviders = async (): Promise<Provider[]> => {
     // In the future, this will be replaced with a real API call
     // const response = await axios.get(`${API_URL}/providers`);
     // return response.data;
-    
+
     return mockProviders;
   } catch (error) {
     console.error('Error fetching providers:', error);
@@ -78,7 +81,7 @@ export const createCredential = async (credential: Omit<Credential, 'id' | 'crea
     // In the future, this will be replaced with a real API call
     // const response = await axios.post(`${API_URL}/credentials`, credential);
     // return response.data;
-    
+
     return {
       ...credential,
       id: `cred-${Math.floor(Math.random() * 1000)}`,
@@ -98,12 +101,12 @@ export const updateCredential = async (id: string, credential: Partial<Credentia
     // In the future, this will be replaced with a real API call
     // const response = await axios.put(`${API_URL}/credentials/${id}`, credential);
     // return response.data;
-    
+
     const existingCredential = mockCredentials.find(cred => cred.id === id);
     if (!existingCredential) {
       throw new Error('Credential not found');
     }
-    
+
     return {
       ...existingCredential,
       ...credential,

@@ -2,56 +2,18 @@ import React, { useState, useEffect } from 'react';
 import {
   Box,
   Button,
-  Card,
-  CircularProgress,
-  Container,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  Divider,
-  Grid,
-  IconButton,
-  Paper,
   Tab,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
   Tabs,
-  TextField,
   Typography,
-  Switch,
-  FormControlLabel,
-  Select,
-  MenuItem,
-  FormControl,
-  InputLabel,
-  Snackbar,
-  Alert,
-  List,
-  ListItem,
-  ListItemIcon,
-  ListItemText,
-  Chip,
 } from '@mui/material';
 import {
   Add as AddIcon,
-  Delete as DeleteIcon,
-  Edit as EditIcon,
-  PlayArrow as PlayArrowIcon,
   Refresh as RefreshIcon,
-  Visibility as VisibilityIcon,
   Storage as StorageIcon,
   Dns as DnsIcon,
-  Schedule as ScheduleIcon,
   History as HistoryIcon,
 } from '@mui/icons-material';
-import { DataGrid } from '@mui/x-data-grid';
 import { PageHeader } from '@/components';
-import axios from '@/lib/axios';
 import { useSnackbar } from '@/hooks/useSnackbar';
 import DataTransferService from '@/services/dataTransfer.service';
 import ConnectionsTable from './components/ConnectionsTable';
@@ -107,10 +69,27 @@ export default function DataTransferPage() {
     connectionId: number;
     connectionName: string;
     connectionString: string;
+    connectionStringForDisplay?: string;
+    connectionDetails?: {
+      server?: string;
+      database?: string;
+      username?: string;
+      password?: string;
+      port?: string;
+    };
     description?: string;
     isSource?: boolean;
     isDestination?: boolean;
-    isActive?: boolean;
+    isActive: boolean;
+    connectionAccessLevel?: 'ReadOnly' | 'WriteOnly' | 'ReadWrite';
+    lastTestedOn?: string | Date | null;
+    createdOn?: string | Date;
+    lastModifiedOn?: string | Date;
+    maxPoolSize?: number;
+    minPoolSize?: number;
+    timeout?: number;
+    encrypt?: boolean;
+    trustServerCertificate?: boolean;
   }
 
   interface RunHistoryItem {
@@ -159,10 +138,15 @@ export default function DataTransferPage() {
   const loadConfigurations = async () => {
     try {
       const response = await DataTransferService.getConfigurations();
+      console.log('Configurations response:', response);
+
       // Check if the response has a $values property (API response format)
       if (response && response.$values) {
-        setConfigurations(response.$values);
-        return response.$values;
+        // Ensure $values is an array
+        const configurationsArray = Array.isArray(response.$values) ? response.$values : [];
+        console.log('Configurations array:', configurationsArray);
+        setConfigurations(configurationsArray);
+        return configurationsArray;
       } else {
         console.error('Unexpected response format:', response);
         setConfigurations([]);
@@ -178,10 +162,15 @@ export default function DataTransferPage() {
   const loadConnections = async () => {
     try {
       const response = await DataTransferService.getConnections();
+      console.log('Connections response:', response);
+
       // Check if the response has a $values property (API response format)
       if (response && response.$values) {
-        setConnections(response.$values);
-        return response.$values;
+        // Ensure $values is an array
+        const connectionsArray = Array.isArray(response.$values) ? response.$values : [];
+        console.log('Connections array:', connectionsArray);
+        setConnections(connectionsArray);
+        return connectionsArray;
       } else {
         console.error('Unexpected response format:', response);
         setConnections([]);
@@ -197,10 +186,15 @@ export default function DataTransferPage() {
   const loadRunHistory = async (configId: number = 0) => {
     try {
       const response = await DataTransferService.getRunHistory(configId);
+      console.log('Run history response:', response);
+
       // Check if the response has a $values property (API response format)
       if (response && response.$values) {
-        setRunHistory(response.$values);
-        return response.$values;
+        // Ensure $values is an array
+        const historyArray = Array.isArray(response.$values) ? response.$values : [];
+        console.log('Run history array:', historyArray);
+        setRunHistory(historyArray);
+        return historyArray;
       } else {
         console.error('Unexpected response format:', response);
         setRunHistory([]);
@@ -240,20 +234,77 @@ export default function DataTransferPage() {
 
   const handleSaveConnection = async (connectionData: Connection) => {
     try {
-      await DataTransferService.saveConnection(connectionData);
+      // Validate connection data before sending to the service
+      if (!connectionData.connectionName || !connectionData.connectionString) {
+        showSnackbar('Connection name and connection string are required', 'error');
+        return;
+      }
+
+      // Get the numeric value for connectionAccessLevel
+      let connectionAccessLevelValue: number;
+
+      if (connectionData.connectionAccessLevel) {
+        // Convert string enum to numeric value
+        switch (connectionData.connectionAccessLevel) {
+          case 'ReadOnly':
+            connectionAccessLevelValue = 0;
+            break;
+          case 'WriteOnly':
+            connectionAccessLevelValue = 1;
+            break;
+          case 'ReadWrite':
+            connectionAccessLevelValue = 2;
+            break;
+          default:
+            connectionAccessLevelValue = 0; // Default to ReadOnly
+        }
+      } else {
+        // Derive from isSource and isDestination
+        connectionAccessLevelValue =
+          (connectionData.isSource && connectionData.isDestination) ? 2 : // ReadWrite
+          connectionData.isSource ? 0 : // ReadOnly
+          connectionData.isDestination ? 1 : 0; // WriteOnly, default to ReadOnly
+      }
+
+      // Format the connection data correctly for the API
+      const formattedConnection = {
+        ...connectionData,
+        connectionAccessLevel: connectionAccessLevelValue,
+        // Add required fields that were missing
+        createdBy: "System",
+        lastModifiedBy: "System",
+        createdOn: connectionData.createdOn || new Date().toISOString(),
+        lastModifiedOn: new Date().toISOString()
+      };
+
+      console.log('Saving connection with data:', formattedConnection);
+
+      // Call the service to save the connection
+      const result = await DataTransferService.saveConnection(formattedConnection);
+
+      // Close the dialog and refresh the connections list
       setIsConnectionDialogOpen(false);
       await loadConnections();
-      showSnackbar('Connection saved successfully', 'success');
+
+      // Show success message
+      showSnackbar(
+        connectionData.connectionId
+          ? `Connection "${connectionData.connectionName}" updated successfully`
+          : `Connection "${connectionData.connectionName}" created successfully`,
+        'success'
+      );
+
+      return result;
     } catch (error: any) {
       console.error('Error saving connection:', error);
 
       // Check if this is a conflict error (409) with an existing connection
       if (error.response && error.response.status === 409) {
-        const { message, existingConnectionId } = error.response.data;
+        const { message, existingConnectionId } = error.response.data || {};
 
         if (existingConnectionId) {
           // If we have the ID of the existing connection, ask if the user wants to edit it instead
-          if (window.confirm(`${message} Would you like to edit the existing connection instead?`)) {
+          if (window.confirm(`${message || 'A connection with this name already exists.'} Would you like to edit the existing connection instead?`)) {
             // Find the existing connection and open it for editing
             const existingConnection = connections.find(c => c.connectionId === existingConnectionId);
             if (existingConnection) {
@@ -263,12 +314,22 @@ export default function DataTransferPage() {
           }
         } else {
           // Just show the conflict message
-          showSnackbar(message, 'warning');
+          showSnackbar(message || 'A connection with this name already exists', 'warning');
         }
+      } else if (error.name === 'SaveConnectionError') {
+        // Show the specific error message from our enhanced error
+        showSnackbar(error.message, 'error');
+      } else if (error.response && error.response.data) {
+        // Show the error message from the API response if available
+        const errorMessage = error.response.data.message || error.response.data.error || 'Failed to save connection';
+        showSnackbar(errorMessage, 'error');
       } else {
         // Show a generic error message for other errors
-        showSnackbar('Error saving connection', 'error');
+        showSnackbar(`Error saving connection: ${error.message || 'Unknown error'}`, 'error');
       }
+
+      // Return null to indicate failure
+      return null;
     }
   };
 
@@ -296,6 +357,31 @@ export default function DataTransferPage() {
     }
   };
 
+  const handleTestConfiguration = async (configId: number) => {
+    try {
+      setIsLoading(true);
+      const response = await DataTransferService.testConfiguration(configId);
+
+      if (response.overallSuccess) {
+        showSnackbar(`All connections successful for "${response.configurationName}"`, 'success');
+      } else {
+        // Determine which connection failed
+        if (!response.source.success && !response.destination.success) {
+          showSnackbar(`Both source and destination connections failed for "${response.configurationName}"`, 'error');
+        } else if (!response.source.success) {
+          showSnackbar(`Source connection failed for "${response.configurationName}": ${response.source.message}`, 'error');
+        } else if (!response.destination.success) {
+          showSnackbar(`Destination connection failed for "${response.configurationName}": ${response.destination.message}`, 'error');
+        }
+      }
+    } catch (error) {
+      console.error('Error testing configuration:', error);
+      showSnackbar('Error testing configuration connections', 'error');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleViewRunDetails = (run: RunHistoryItem) => {
     loadRunDetails(run.runId);
   };
@@ -310,14 +396,81 @@ export default function DataTransferPage() {
     setIsRunDetailsDialogOpen(false);
   };
 
+  const handleTestConnection = async (connection: Connection) => {
+    try {
+      setIsLoading(true);
+
+      // Get the numeric value for connectionAccessLevel
+      let connectionAccessLevelValue: number;
+
+      if (connection.connectionAccessLevel) {
+        // Convert string enum to numeric value
+        switch (connection.connectionAccessLevel) {
+          case 'ReadOnly':
+            connectionAccessLevelValue = 0;
+            break;
+          case 'WriteOnly':
+            connectionAccessLevelValue = 1;
+            break;
+          case 'ReadWrite':
+            connectionAccessLevelValue = 2;
+            break;
+          default:
+            connectionAccessLevelValue = 0; // Default to ReadOnly
+        }
+      } else {
+        // Derive from isSource and isDestination
+        connectionAccessLevelValue =
+          (connection.isSource && connection.isDestination) ? 2 : // ReadWrite
+          connection.isSource ? 0 : // ReadOnly
+          connection.isDestination ? 1 : 0; // WriteOnly, default to ReadOnly
+      }
+
+      // Format the connection data correctly for the API
+      const connectionData = {
+        connectionId: connection.connectionId,
+        connectionName: connection.connectionName,
+        connectionString: connection.connectionString,
+        description: connection.description || '',
+        connectionAccessLevel: connectionAccessLevelValue,
+        isActive: connection.isActive,
+        maxPoolSize: connection.maxPoolSize || 100,
+        minPoolSize: connection.minPoolSize || 5,
+        timeout: connection.timeout || 30,
+        encrypt: connection.encrypt !== undefined ? connection.encrypt : true,
+        trustServerCertificate: connection.trustServerCertificate !== undefined ? connection.trustServerCertificate : true,
+        // Add required fields that were missing
+        createdBy: "System",
+        lastModifiedBy: "System", // This was the missing required field
+        createdOn: connection.createdOn || new Date().toISOString(),
+        lastModifiedOn: connection.lastModifiedOn || new Date().toISOString()
+      };
+
+      console.log('Testing connection with data:', connectionData);
+      const response = await DataTransferService.testConnection(connectionData);
+
+      if (response.success) {
+        showSnackbar(`Connection successful to ${response.database} on ${response.server}`, 'success');
+      } else {
+        showSnackbar(`Connection failed: ${response.message}`, 'error');
+        console.error('Connection test failed:', response);
+      }
+    } catch (error) {
+      console.error('Error testing connection:', error);
+      showSnackbar('Error testing connection', 'error');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
-    <Container maxWidth="xl">
+    <Box sx={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column' }}>
       <PageHeader
         title="Data Transfer Management"
         subtitle="Configure and manage incremental data transfers between databases"
       />
 
-      <Box sx={{ width: '100%' }}>
+      <Box sx={{ width: '100%', flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
         <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
           <Tabs value={activeTab} onChange={handleTabChange} aria-label="data transfer tabs">
             <Tab icon={<DnsIcon />} iconPosition="start" label="Configurations" />
@@ -355,6 +508,7 @@ export default function DataTransferPage() {
             connections={connections}
             onEdit={handleOpenConfigDialog}
             onExecute={handleExecuteTransfer}
+            onTest={handleTestConfiguration}
             onViewHistory={handleFilterRunHistory}
             isLoading={isLoading}
           />
@@ -387,6 +541,7 @@ export default function DataTransferPage() {
           <ConnectionsTable
             connections={connections}
             onEdit={handleOpenConnectionDialog}
+            onTest={handleTestConnection}
             isLoading={isLoading}
           />
         </TabPanel>
@@ -454,6 +609,6 @@ export default function DataTransferPage() {
         runDetails={runDetails}
         onClose={handleCloseRunDetails}
       />
-    </Container>
+    </Box>
   );
 }

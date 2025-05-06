@@ -285,8 +285,9 @@ builder.Services.AddScoped<MCPServer.Core.Features.Shared.Services.Interfaces.IC
 builder.Services.AddScoped<MCPServer.Core.Services.DatabaseInitializer>();
 builder.Services.AddScoped<MCPServer.Core.Data.LlmProviderSeeder>();
 
-// Register DataTransferService
+// Register DataTransfer services
 builder.Services.AddScoped<MCPServer.Core.Services.DataTransfer.DataTransferService>();
+builder.Services.AddScoped<MCPServer.Core.Services.DataTransfer.ConnectionStringHasher>();
 
 var app = builder.Build();
 

@@ -45,13 +45,13 @@ import {
   Refresh as RefreshIcon,
   Visibility as VisibilityIcon,
   CloudUpload as CloudUploadIcon,
+  CloudDownload as CloudDownloadIcon,
   Database as DatabaseIcon,
   Schedule as ScheduleIcon,
   History as HistoryIcon,
 } from '@mui/icons-material';
 import { DataGrid } from '@mui/x-data-grid';
 import axios from 'axios';
-import { API_BASE_URL } from '../config';
 
 function TabPanel(props) {
   const { children, value, index, ...other } = props;
@@ -136,7 +136,7 @@ export default function DataTransferPage() {
 
   const useMockData = async () => {
     try {
-      const response = await axios.post(`${API_BASE_URL}/api/data-transfer/use-mock-data`);
+      const response = await axios.post(`/api/data-transfer/use-mock-data`);
       setConfigurations(response.data);
       showSnackbar('Using mock data for demonstration', 'info');
     } catch (error) {
@@ -148,14 +148,14 @@ export default function DataTransferPage() {
   const loadConfigurations = async () => {
     setIsLoading(true);
     try {
-      const response = await axios.get(`${API_BASE_URL}/api/data-transfer/configurations`);
+      const response = await axios.get(`/api/data-transfer/configurations`);
       setConfigurations(response.data);
     } catch (error) {
       console.error('Error loading configurations:', error);
       showSnackbar('Error loading configurations', 'error');
       // Try to use mock data if real data fails
       try {
-        const mockResponse = await axios.post(`${API_BASE_URL}/api/data-transfer/use-mock-data`);
+        const mockResponse = await axios.post(`/api/data-transfer/use-mock-data`);
         setConfigurations(mockResponse.data);
         showSnackbar('Using mock data for demonstration', 'info');
       } catch (mockError) {
@@ -168,7 +168,7 @@ export default function DataTransferPage() {
 
   const loadConnections = async () => {
     try {
-      const response = await axios.get(`${API_BASE_URL}/api/data-transfer/connections`);
+      const response = await axios.get(`/api/data-transfer/connections`);
       setConnections(response.data);
     } catch (error) {
       console.error('Error loading connections:', error);
@@ -178,7 +178,7 @@ export default function DataTransferPage() {
 
   const loadRunHistory = async (configId = 0) => {
     try {
-      const response = await axios.get(`${API_BASE_URL}/api/data-transfer/history`, {
+      const response = await axios.get(`/api/data-transfer/history`, {
         params: { configurationId: configId, limit: 50 }
       });
       setRunHistory(response.data);
@@ -190,7 +190,7 @@ export default function DataTransferPage() {
 
   const loadRunDetails = async (runId) => {
     try {
-      const response = await axios.get(`${API_BASE_URL}/api/data-transfer/runs/${runId}`);
+      const response = await axios.get(`/api/data-transfer/runs/${runId}`);
       setRunDetails(response.data);
       setIsRunDetailsDialogOpen(true);
     } catch (error) {
@@ -246,7 +246,7 @@ export default function DataTransferPage() {
 
   const handleSaveConnection = async () => {
     try {
-      const response = await axios.post(`${API_BASE_URL}/api/data-transfer/connections`, newConnection);
+      const response = await axios.post(`/api/data-transfer/connections`, newConnection);
       setIsConnectionDialogOpen(false);
       loadConnections();
       showSnackbar('Connection saved successfully', 'success');
@@ -265,7 +265,7 @@ export default function DataTransferPage() {
         destinationConnection: { connectionId: newConfig.destinationConnectionId }
       };
 
-      const response = await axios.post(`${API_BASE_URL}/api/data-transfer/configurations`, configToSave);
+      const response = await axios.post(`/api/data-transfer/configurations`, configToSave);
       setIsConfigDialogOpen(false);
       loadConfigurations();
       showSnackbar('Configuration saved successfully', 'success');
@@ -330,7 +330,7 @@ export default function DataTransferPage() {
 
   const handleExecuteTransfer = async (configId) => {
     try {
-      const response = await axios.post(`${API_BASE_URL}/api/data-transfer/configurations/${configId}/execute`);
+      const response = await axios.post(`/api/data-transfer/configurations/${configId}/execute`);
       showSnackbar('Data transfer started successfully', 'success');
       // Reload run history after a short delay to show the new run
       setTimeout(() => loadRunHistory(), 1000);

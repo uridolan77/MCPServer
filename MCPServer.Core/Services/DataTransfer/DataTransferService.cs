@@ -7,13 +7,35 @@ using Microsoft.Extensions.Logging;
 
 namespace MCPServer.Core.Services.DataTransfer
 {
+    /// <summary>
+    /// Defines the access level for a database connection
+    /// </summary>
+    public enum ConnectionAccessLevel
+    {
+        /// <summary>
+        /// Connection can be used for reading data only
+        /// </summary>
+        ReadOnly,
+
+        /// <summary>
+        /// Connection can be used for writing data only
+        /// </summary>
+        WriteOnly,
+
+        /// <summary>
+        /// Connection can be used for both reading and writing data
+        /// </summary>
+        ReadWrite
+    }
     public class DataTransferService
     {
         private readonly ILogger<DataTransferService> _logger;
+        private readonly ConnectionStringHasher _connectionStringHasher;
 
-        public DataTransferService(ILogger<DataTransferService> logger)
+        public DataTransferService(ILogger<DataTransferService> logger, ConnectionStringHasher connectionStringHasher)
         {
             _logger = logger;
+            _connectionStringHasher = connectionStringHasher;
         }
 
         public async Task<List<DataTransferConfigurationDto>> GetAllConfigurationsAsync(string connectionString)
@@ -72,8 +94,8 @@ namespace MCPServer.Core.Services.DataTransfer
                 // Load table mappings for each configuration
                 foreach (var config in configurations)
                 {
-                    config.TableMappings = await GetTableMappingsAsync(connection, config.ConfigurationId);
-                    config.Schedules = await GetSchedulesAsync(connection, config.ConfigurationId);
+                    config.TableMappings = await GetTableMappingsAsync(connectionString, config.ConfigurationId);
+                    config.Schedules = await GetSchedulesAsync(connectionString, config.ConfigurationId);
                 }
             }
 
@@ -85,6 +107,9 @@ namespace MCPServer.Core.Services.DataTransfer
             using (var connection = new SqlConnection(connectionString))
             {
                 await connection.OpenAsync();
+
+                // First, get the basic configuration data
+                DataTransferConfigurationDto config = null;
 
                 string sql = @"
                     SELECT c.ConfigurationId, c.ConfigurationName, c.Description,
@@ -108,7 +133,7 @@ namespace MCPServer.Core.Services.DataTransfer
                     {
                         if (await reader.ReadAsync())
                         {
-                            var config = new DataTransferConfigurationDto
+                            config = new DataTransferConfigurationDto
                             {
                                 ConfigurationId = reader.GetInt32(reader.GetOrdinal("ConfigurationId")),
                                 ConfigurationName = reader.GetString(reader.GetOrdinal("ConfigurationName")),
@@ -129,52 +154,61 @@ namespace MCPServer.Core.Services.DataTransfer
                                     ConnectionString = reader.GetString(reader.GetOrdinal("DestinationConnectionString"))
                                 }
                             };
-
-                            // Load table mappings and schedules
-                            config.TableMappings = await GetTableMappingsAsync(connection, config.ConfigurationId);
-                            config.Schedules = await GetSchedulesAsync(connection, config.ConfigurationId);
-
-                            return config;
                         }
                     }
                 }
-            }
 
-            return null;
+                // If we found the configuration, load the table mappings and schedules
+                if (config != null)
+                {
+                    // Load table mappings in a separate query
+                    config.TableMappings = await GetTableMappingsAsync(connectionString, config.ConfigurationId);
+
+                    // Load schedules in a separate query
+                    config.Schedules = await GetSchedulesAsync(connectionString, config.ConfigurationId);
+                }
+
+                return config;
+            }
         }
 
-        private async Task<List<TableMappingDto>> GetTableMappingsAsync(SqlConnection connection, int configurationId)
+        private async Task<List<TableMappingDto>> GetTableMappingsAsync(string connectionString, int configurationId)
         {
             var mappings = new List<TableMappingDto>();
 
-            string sql = @"
-                SELECT MappingId, ConfigurationId, SchemaName, TableName,
-                       TimestampColumnName, OrderByColumn, CustomWhereClause,
-                       IsActive, Priority
-                FROM dbo.DataTransferTableMappings
-                WHERE ConfigurationId = @configId
-                ORDER BY Priority, SchemaName, TableName";
-
-            using (var command = new SqlCommand(sql, connection))
+            using (var connection = new SqlConnection(connectionString))
             {
-                command.Parameters.AddWithValue("@configId", configurationId);
+                await connection.OpenAsync();
 
-                using (var reader = await command.ExecuteReaderAsync())
+                string sql = @"
+                    SELECT MappingId, ConfigurationId, SchemaName, TableName,
+                           TimestampColumnName, OrderByColumn, CustomWhereClause,
+                           IsActive, Priority
+                    FROM dbo.DataTransferTableMappings
+                    WHERE ConfigurationId = @configId
+                    ORDER BY Priority, SchemaName, TableName";
+
+                using (var command = new SqlCommand(sql, connection))
                 {
-                    while (await reader.ReadAsync())
+                    command.Parameters.AddWithValue("@configId", configurationId);
+
+                    using (var reader = await command.ExecuteReaderAsync())
                     {
-                        mappings.Add(new TableMappingDto
+                        while (await reader.ReadAsync())
                         {
-                            MappingId = reader.GetInt32(reader.GetOrdinal("MappingId")),
-                            ConfigurationId = reader.GetInt32(reader.GetOrdinal("ConfigurationId")),
-                            SchemaName = reader.GetString(reader.GetOrdinal("SchemaName")),
-                            TableName = reader.GetString(reader.GetOrdinal("TableName")),
-                            TimestampColumnName = reader.GetString(reader.GetOrdinal("TimestampColumnName")),
-                            OrderByColumn = reader.IsDBNull(reader.GetOrdinal("OrderByColumn")) ? null : reader.GetString(reader.GetOrdinal("OrderByColumn")),
-                            CustomWhereClause = reader.IsDBNull(reader.GetOrdinal("CustomWhereClause")) ? null : reader.GetString(reader.GetOrdinal("CustomWhereClause")),
-                            IsActive = reader.GetBoolean(reader.GetOrdinal("IsActive")),
-                            Priority = reader.GetInt32(reader.GetOrdinal("Priority"))
-                        });
+                            mappings.Add(new TableMappingDto
+                            {
+                                MappingId = reader.GetInt32(reader.GetOrdinal("MappingId")),
+                                ConfigurationId = reader.GetInt32(reader.GetOrdinal("ConfigurationId")),
+                                SchemaName = reader.GetString(reader.GetOrdinal("SchemaName")),
+                                TableName = reader.GetString(reader.GetOrdinal("TableName")),
+                                TimestampColumnName = reader.GetString(reader.GetOrdinal("TimestampColumnName")),
+                                OrderByColumn = reader.IsDBNull(reader.GetOrdinal("OrderByColumn")) ? null : reader.GetString(reader.GetOrdinal("OrderByColumn")),
+                                CustomWhereClause = reader.IsDBNull(reader.GetOrdinal("CustomWhereClause")) ? null : reader.GetString(reader.GetOrdinal("CustomWhereClause")),
+                                IsActive = reader.GetBoolean(reader.GetOrdinal("IsActive")),
+                                Priority = reader.GetInt32(reader.GetOrdinal("Priority"))
+                            });
+                        }
                     }
                 }
             }
@@ -182,45 +216,204 @@ namespace MCPServer.Core.Services.DataTransfer
             return mappings;
         }
 
-        private async Task<List<ScheduleDto>> GetSchedulesAsync(SqlConnection connection, int configurationId)
+        private async Task<List<ScheduleDto>> GetSchedulesAsync(string connectionString, int configurationId)
         {
             var schedules = new List<ScheduleDto>();
 
-            string sql = @"
-                SELECT ScheduleId, ConfigurationId, ScheduleType, StartTime,
-                       Frequency, FrequencyUnit, WeekDays, MonthDays,
-                       IsActive, LastRunTime, NextRunTime
-                FROM dbo.DataTransferSchedule
-                WHERE ConfigurationId = @configId
-                ORDER BY IsActive DESC, NextRunTime";
-
-            using (var command = new SqlCommand(sql, connection))
+            using (var connection = new SqlConnection(connectionString))
             {
-                command.Parameters.AddWithValue("@configId", configurationId);
+                await connection.OpenAsync();
 
-                using (var reader = await command.ExecuteReaderAsync())
+                string sql = @"
+                    SELECT ScheduleId, ConfigurationId, ScheduleType, StartTime,
+                           Frequency, FrequencyUnit, WeekDays, MonthDays,
+                           IsActive, LastRunTime, NextRunTime
+                    FROM dbo.DataTransferSchedule
+                    WHERE ConfigurationId = @configId
+                    ORDER BY IsActive DESC, NextRunTime";
+
+                using (var command = new SqlCommand(sql, connection))
                 {
-                    while (await reader.ReadAsync())
+                    command.Parameters.AddWithValue("@configId", configurationId);
+
+                    using (var reader = await command.ExecuteReaderAsync())
                     {
-                        schedules.Add(new ScheduleDto
+                        while (await reader.ReadAsync())
                         {
-                            ScheduleId = reader.GetInt32(reader.GetOrdinal("ScheduleId")),
-                            ConfigurationId = reader.GetInt32(reader.GetOrdinal("ConfigurationId")),
-                            ScheduleType = reader.GetString(reader.GetOrdinal("ScheduleType")),
-                            StartTime = reader.IsDBNull(reader.GetOrdinal("StartTime")) ? (TimeSpan?)null : reader.GetTimeSpan(reader.GetOrdinal("StartTime")),
-                            Frequency = reader.IsDBNull(reader.GetOrdinal("Frequency")) ? (int?)null : reader.GetInt32(reader.GetOrdinal("Frequency")),
-                            FrequencyUnit = reader.IsDBNull(reader.GetOrdinal("FrequencyUnit")) ? null : reader.GetString(reader.GetOrdinal("FrequencyUnit")),
-                            WeekDays = reader.IsDBNull(reader.GetOrdinal("WeekDays")) ? null : reader.GetString(reader.GetOrdinal("WeekDays")),
-                            MonthDays = reader.IsDBNull(reader.GetOrdinal("MonthDays")) ? null : reader.GetString(reader.GetOrdinal("MonthDays")),
-                            IsActive = reader.GetBoolean(reader.GetOrdinal("IsActive")),
-                            LastRunTime = reader.IsDBNull(reader.GetOrdinal("LastRunTime")) ? (DateTime?)null : reader.GetDateTime(reader.GetOrdinal("LastRunTime")),
-                            NextRunTime = reader.IsDBNull(reader.GetOrdinal("NextRunTime")) ? (DateTime?)null : reader.GetDateTime(reader.GetOrdinal("NextRunTime"))
-                        });
+                            schedules.Add(new ScheduleDto
+                            {
+                                ScheduleId = reader.GetInt32(reader.GetOrdinal("ScheduleId")),
+                                ConfigurationId = reader.GetInt32(reader.GetOrdinal("ConfigurationId")),
+                                ScheduleType = reader.GetString(reader.GetOrdinal("ScheduleType")),
+                                StartTime = reader.IsDBNull(reader.GetOrdinal("StartTime")) ? (TimeSpan?)null : reader.GetTimeSpan(reader.GetOrdinal("StartTime")),
+                                Frequency = reader.IsDBNull(reader.GetOrdinal("Frequency")) ? (int?)null : reader.GetInt32(reader.GetOrdinal("Frequency")),
+                                FrequencyUnit = reader.IsDBNull(reader.GetOrdinal("FrequencyUnit")) ? null : reader.GetString(reader.GetOrdinal("FrequencyUnit")),
+                                WeekDays = reader.IsDBNull(reader.GetOrdinal("WeekDays")) ? null : reader.GetString(reader.GetOrdinal("WeekDays")),
+                                MonthDays = reader.IsDBNull(reader.GetOrdinal("MonthDays")) ? null : reader.GetString(reader.GetOrdinal("MonthDays")),
+                                IsActive = reader.GetBoolean(reader.GetOrdinal("IsActive")),
+                                LastRunTime = reader.IsDBNull(reader.GetOrdinal("LastRunTime")) ? (DateTime?)null : reader.GetDateTime(reader.GetOrdinal("LastRunTime")),
+                                NextRunTime = reader.IsDBNull(reader.GetOrdinal("NextRunTime")) ? (DateTime?)null : reader.GetDateTime(reader.GetOrdinal("NextRunTime"))
+                            });
+                        }
                     }
                 }
             }
 
             return schedules;
+        }
+
+        public async Task<ConnectionDto> GetConnectionAsync(string connectionString, int connectionId)
+        {
+            using (var connection = new SqlConnection(connectionString))
+            {
+                await connection.OpenAsync();
+
+                // Check if the ConnectionAccessLevel column exists
+                bool hasAccessLevelColumn = false;
+                bool hasLastTestedOnColumn = false;
+
+                string checkColumnsSql = @"
+                    SELECT
+                        COUNT(*) AS ColumnCount
+                    FROM
+                        INFORMATION_SCHEMA.COLUMNS
+                    WHERE
+                        TABLE_NAME = 'DataTransferConnections'
+                        AND COLUMN_NAME = 'ConnectionAccessLevel'";
+
+                using (var checkCommand = new SqlCommand(checkColumnsSql, connection))
+                {
+                    var result = await checkCommand.ExecuteScalarAsync();
+                    hasAccessLevelColumn = Convert.ToInt32(result) > 0;
+                }
+
+                checkColumnsSql = @"
+                    SELECT
+                        COUNT(*) AS ColumnCount
+                    FROM
+                        INFORMATION_SCHEMA.COLUMNS
+                    WHERE
+                        TABLE_NAME = 'DataTransferConnections'
+                        AND COLUMN_NAME = 'LastTestedOn'";
+
+                using (var checkCommand = new SqlCommand(checkColumnsSql, connection))
+                {
+                    var result = await checkCommand.ExecuteScalarAsync();
+                    hasLastTestedOnColumn = Convert.ToInt32(result) > 0;
+                }
+
+                string sql;
+
+                if (hasAccessLevelColumn)
+                {
+                    // Use the new schema with ConnectionAccessLevel
+                    sql = @"
+                        SELECT ConnectionId, ConnectionName, ConnectionString, Description,
+                               ConnectionAccessLevel, IsActive, LastTestedOn, CreatedOn, CreatedBy,
+                               LastModifiedOn, LastModifiedBy,
+                               ISNULL(MaxPoolSize, 100) AS MaxPoolSize,
+                               ISNULL(MinPoolSize, 5) AS MinPoolSize,
+                               ISNULL(Timeout, 30) AS Timeout,
+                               ISNULL(Encrypt, 1) AS Encrypt,
+                               ISNULL(TrustServerCertificate, 1) AS TrustServerCertificate
+                        FROM dbo.DataTransferConnections
+                        WHERE ConnectionId = @connectionId";
+                }
+                else
+                {
+                    // Use the old schema with IsSource and IsDestination
+                    sql = @"
+                        SELECT ConnectionId, ConnectionName, ConnectionString, Description,
+                               IsSource, IsDestination, IsActive
+                        FROM dbo.DataTransferConnections
+                        WHERE ConnectionId = @connectionId";
+                }
+
+                using (var command = new SqlCommand(sql, connection))
+                {
+                    command.Parameters.AddWithValue("@connectionId", connectionId);
+
+                    using (var reader = await command.ExecuteReaderAsync())
+                    {
+                        if (await reader.ReadAsync())
+                        {
+                            string rawConnectionString = reader.GetString(reader.GetOrdinal("ConnectionString"));
+
+                            var connectionDto = new ConnectionDto
+                            {
+                                ConnectionId = reader.GetInt32(reader.GetOrdinal("ConnectionId")),
+                                ConnectionName = reader.GetString(reader.GetOrdinal("ConnectionName")),
+                                ConnectionString = rawConnectionString,
+                                Description = reader.IsDBNull(reader.GetOrdinal("Description")) ? string.Empty : reader.GetString(reader.GetOrdinal("Description")),
+                                IsActive = reader.GetBoolean(reader.GetOrdinal("IsActive"))
+                            };
+
+                            // If the connection string is hashed, create a dummy connection string for UI display
+                            if (_connectionStringHasher.IsConnectionStringHashed(rawConnectionString))
+                            {
+                                connectionDto.ConnectionStringForDisplay = _connectionStringHasher.CreateDummyConnectionString(rawConnectionString);
+                                connectionDto.ConnectionDetails = _connectionStringHasher.ExtractConnectionDetails(rawConnectionString);
+                            }
+
+                            if (hasAccessLevelColumn)
+                            {
+                                string accessLevel = reader.GetString(reader.GetOrdinal("ConnectionAccessLevel"));
+                                connectionDto.ConnectionAccessLevel = Enum.Parse<ConnectionAccessLevel>(accessLevel);
+
+                                if (hasLastTestedOnColumn && !reader.IsDBNull(reader.GetOrdinal("LastTestedOn")))
+                                {
+                                    connectionDto.LastTestedOn = reader.GetDateTime(reader.GetOrdinal("LastTestedOn"));
+                                }
+
+                                // Read additional fields if they exist
+                                if (!reader.IsDBNull(reader.GetOrdinal("CreatedOn")))
+                                {
+                                    connectionDto.CreatedOn = reader.GetDateTime(reader.GetOrdinal("CreatedOn"));
+                                }
+
+                                if (!reader.IsDBNull(reader.GetOrdinal("CreatedBy")))
+                                {
+                                    connectionDto.CreatedBy = reader.GetString(reader.GetOrdinal("CreatedBy"));
+                                }
+
+                                if (!reader.IsDBNull(reader.GetOrdinal("LastModifiedOn")))
+                                {
+                                    connectionDto.LastModifiedOn = reader.GetDateTime(reader.GetOrdinal("LastModifiedOn"));
+                                }
+
+                                if (!reader.IsDBNull(reader.GetOrdinal("LastModifiedBy")))
+                                {
+                                    connectionDto.LastModifiedBy = reader.GetString(reader.GetOrdinal("LastModifiedBy"));
+                                }
+
+                                // Read connection pool settings
+                                connectionDto.MaxPoolSize = reader.GetInt32(reader.GetOrdinal("MaxPoolSize"));
+                                connectionDto.MinPoolSize = reader.GetInt32(reader.GetOrdinal("MinPoolSize"));
+                                connectionDto.Timeout = reader.GetInt32(reader.GetOrdinal("Timeout"));
+                                connectionDto.Encrypt = reader.GetBoolean(reader.GetOrdinal("Encrypt"));
+                                connectionDto.TrustServerCertificate = reader.GetBoolean(reader.GetOrdinal("TrustServerCertificate"));
+                            }
+                            else
+                            {
+                                // Set ConnectionAccessLevel based on IsSource and IsDestination
+                                bool isSourceValue = reader.GetBoolean(reader.GetOrdinal("IsSource"));
+                                bool isDestinationValue = reader.GetBoolean(reader.GetOrdinal("IsDestination"));
+
+                                if (isSourceValue && isDestinationValue)
+                                    connectionDto.ConnectionAccessLevel = ConnectionAccessLevel.ReadWrite;
+                                else if (isSourceValue)
+                                    connectionDto.ConnectionAccessLevel = ConnectionAccessLevel.ReadOnly;
+                                else if (isDestinationValue)
+                                    connectionDto.ConnectionAccessLevel = ConnectionAccessLevel.WriteOnly;
+                            }
+
+                            return connectionDto;
+                        }
+                    }
+                }
+            }
+
+            return null;
         }
 
         public async Task<List<ConnectionDto>> GetConnectionsAsync(string connectionString, bool? isSource = null, bool? isDestination = null, bool? isActive = true)
@@ -231,35 +424,181 @@ namespace MCPServer.Core.Services.DataTransfer
             {
                 await connection.OpenAsync();
 
-                string sql = @"
-                    SELECT ConnectionId, ConnectionName, ConnectionString, Description,
-                           IsSource, IsDestination, IsActive
-                    FROM dbo.DataTransferConnections
-                    WHERE (@isSource IS NULL OR IsSource = @isSource)
-                      AND (@isDestination IS NULL OR IsDestination = @isDestination)
-                      AND (@isActive IS NULL OR IsActive = @isActive)
-                    ORDER BY ConnectionName";
+                // Check if the ConnectionAccessLevel column exists
+                bool hasAccessLevelColumn = false;
+                bool hasLastTestedOnColumn = false;
+
+                string checkColumnsSql = @"
+                    SELECT
+                        COUNT(*) AS ColumnCount
+                    FROM
+                        INFORMATION_SCHEMA.COLUMNS
+                    WHERE
+                        TABLE_NAME = 'DataTransferConnections'
+                        AND COLUMN_NAME = 'ConnectionAccessLevel'";
+
+                using (var checkCommand = new SqlCommand(checkColumnsSql, connection))
+                {
+                    var result = await checkCommand.ExecuteScalarAsync();
+                    hasAccessLevelColumn = Convert.ToInt32(result) > 0;
+                }
+
+                checkColumnsSql = @"
+                    SELECT
+                        COUNT(*) AS ColumnCount
+                    FROM
+                        INFORMATION_SCHEMA.COLUMNS
+                    WHERE
+                        TABLE_NAME = 'DataTransferConnections'
+                        AND COLUMN_NAME = 'LastTestedOn'";
+
+                using (var checkCommand = new SqlCommand(checkColumnsSql, connection))
+                {
+                    var result = await checkCommand.ExecuteScalarAsync();
+                    hasLastTestedOnColumn = Convert.ToInt32(result) > 0;
+                }
+
+                string sql;
+
+                if (hasAccessLevelColumn)
+                {
+                    // Use the new schema with ConnectionAccessLevel
+                    sql = @"
+                        SELECT ConnectionId, ConnectionName, ConnectionString, Description,
+                               ConnectionAccessLevel, IsActive, LastTestedOn, CreatedOn, CreatedBy,
+                               LastModifiedOn, LastModifiedBy,
+                               ISNULL(MaxPoolSize, 100) AS MaxPoolSize,
+                               ISNULL(MinPoolSize, 5) AS MinPoolSize,
+                               ISNULL(Timeout, 30) AS Timeout,
+                               ISNULL(Encrypt, 1) AS Encrypt,
+                               ISNULL(TrustServerCertificate, 1) AS TrustServerCertificate
+                        FROM dbo.DataTransferConnections
+                        WHERE (@isActive IS NULL OR IsActive = @isActive)";
+
+                    // Add filters for source/destination based on ConnectionAccessLevel
+                    if (isSource.HasValue)
+                    {
+                        if (isSource.Value)
+                        {
+                            sql += " AND (ConnectionAccessLevel = 'ReadOnly' OR ConnectionAccessLevel = 'ReadWrite')";
+                        }
+                        else
+                        {
+                            sql += " AND (ConnectionAccessLevel = 'WriteOnly')";
+                        }
+                    }
+
+                    if (isDestination.HasValue)
+                    {
+                        if (isDestination.Value)
+                        {
+                            sql += " AND (ConnectionAccessLevel = 'WriteOnly' OR ConnectionAccessLevel = 'ReadWrite')";
+                        }
+                        else
+                        {
+                            sql += " AND (ConnectionAccessLevel = 'ReadOnly')";
+                        }
+                    }
+
+                    sql += " ORDER BY ConnectionName";
+                }
+                else
+                {
+                    // Use the old schema with IsSource and IsDestination
+                    sql = @"
+                        SELECT ConnectionId, ConnectionName, ConnectionString, Description,
+                               IsSource, IsDestination, IsActive
+                        FROM dbo.DataTransferConnections
+                        WHERE (@isSource IS NULL OR IsSource = @isSource)
+                          AND (@isDestination IS NULL OR IsDestination = @isDestination)
+                          AND (@isActive IS NULL OR IsActive = @isActive)
+                        ORDER BY ConnectionName";
+                }
 
                 using (var command = new SqlCommand(sql, connection))
                 {
-                    command.Parameters.AddWithValue("@isSource", isSource ?? (object)DBNull.Value);
-                    command.Parameters.AddWithValue("@isDestination", isDestination ?? (object)DBNull.Value);
+                    if (!hasAccessLevelColumn)
+                    {
+                        command.Parameters.AddWithValue("@isSource", isSource ?? (object)DBNull.Value);
+                        command.Parameters.AddWithValue("@isDestination", isDestination ?? (object)DBNull.Value);
+                    }
                     command.Parameters.AddWithValue("@isActive", isActive ?? (object)DBNull.Value);
 
                     using (var reader = await command.ExecuteReaderAsync())
                     {
                         while (await reader.ReadAsync())
                         {
-                            connections.Add(new ConnectionDto
+                            string rawConnectionString = reader.GetString(reader.GetOrdinal("ConnectionString"));
+
+                            var connectionDto = new ConnectionDto
                             {
                                 ConnectionId = reader.GetInt32(reader.GetOrdinal("ConnectionId")),
                                 ConnectionName = reader.GetString(reader.GetOrdinal("ConnectionName")),
-                                ConnectionString = reader.GetString(reader.GetOrdinal("ConnectionString")),
-                                Description = reader.IsDBNull(reader.GetOrdinal("Description")) ? null : reader.GetString(reader.GetOrdinal("Description")),
-                                IsSource = reader.GetBoolean(reader.GetOrdinal("IsSource")),
-                                IsDestination = reader.GetBoolean(reader.GetOrdinal("IsDestination")),
+                                ConnectionString = rawConnectionString,
+                                Description = reader.IsDBNull(reader.GetOrdinal("Description")) ? string.Empty : reader.GetString(reader.GetOrdinal("Description")),
                                 IsActive = reader.GetBoolean(reader.GetOrdinal("IsActive"))
-                            });
+                            };
+
+                            // If the connection string is hashed, create a dummy connection string for UI display
+                            if (_connectionStringHasher.IsConnectionStringHashed(rawConnectionString))
+                            {
+                                connectionDto.ConnectionStringForDisplay = _connectionStringHasher.CreateDummyConnectionString(rawConnectionString);
+                                connectionDto.ConnectionDetails = _connectionStringHasher.ExtractConnectionDetails(rawConnectionString);
+                            }
+
+                            if (hasAccessLevelColumn)
+                            {
+                                string accessLevel = reader.GetString(reader.GetOrdinal("ConnectionAccessLevel"));
+                                connectionDto.ConnectionAccessLevel = Enum.Parse<ConnectionAccessLevel>(accessLevel);
+
+                                if (hasLastTestedOnColumn && !reader.IsDBNull(reader.GetOrdinal("LastTestedOn")))
+                                {
+                                    connectionDto.LastTestedOn = reader.GetDateTime(reader.GetOrdinal("LastTestedOn"));
+                                }
+
+                                // Read additional fields if they exist
+                                if (!reader.IsDBNull(reader.GetOrdinal("CreatedOn")))
+                                {
+                                    connectionDto.CreatedOn = reader.GetDateTime(reader.GetOrdinal("CreatedOn"));
+                                }
+
+                                if (!reader.IsDBNull(reader.GetOrdinal("CreatedBy")))
+                                {
+                                    connectionDto.CreatedBy = reader.GetString(reader.GetOrdinal("CreatedBy"));
+                                }
+
+                                if (!reader.IsDBNull(reader.GetOrdinal("LastModifiedOn")))
+                                {
+                                    connectionDto.LastModifiedOn = reader.GetDateTime(reader.GetOrdinal("LastModifiedOn"));
+                                }
+
+                                if (!reader.IsDBNull(reader.GetOrdinal("LastModifiedBy")))
+                                {
+                                    connectionDto.LastModifiedBy = reader.GetString(reader.GetOrdinal("LastModifiedBy"));
+                                }
+
+                                // Read connection pool settings
+                                connectionDto.MaxPoolSize = reader.GetInt32(reader.GetOrdinal("MaxPoolSize"));
+                                connectionDto.MinPoolSize = reader.GetInt32(reader.GetOrdinal("MinPoolSize"));
+                                connectionDto.Timeout = reader.GetInt32(reader.GetOrdinal("Timeout"));
+                                connectionDto.Encrypt = reader.GetBoolean(reader.GetOrdinal("Encrypt"));
+                                connectionDto.TrustServerCertificate = reader.GetBoolean(reader.GetOrdinal("TrustServerCertificate"));
+                            }
+                            else
+                            {
+                                // Set ConnectionAccessLevel based on IsSource and IsDestination
+                                bool isSourceValue = reader.GetBoolean(reader.GetOrdinal("IsSource"));
+                                bool isDestinationValue = reader.GetBoolean(reader.GetOrdinal("IsDestination"));
+
+                                if (isSourceValue && isDestinationValue)
+                                    connectionDto.ConnectionAccessLevel = ConnectionAccessLevel.ReadWrite;
+                                else if (isSourceValue)
+                                    connectionDto.ConnectionAccessLevel = ConnectionAccessLevel.ReadOnly;
+                                else if (isDestinationValue)
+                                    connectionDto.ConnectionAccessLevel = ConnectionAccessLevel.WriteOnly;
+                            }
+
+                            connections.Add(connectionDto);
                         }
                     }
                 }
@@ -296,31 +635,124 @@ namespace MCPServer.Core.Services.DataTransfer
                     }
                 }
 
+                // Check if the ConnectionAccessLevel column exists
+                bool hasAccessLevelColumn = false;
+                bool hasLastTestedOnColumn = false;
+
+                string checkColumnsSql = @"
+                    SELECT
+                        COUNT(*) AS ColumnCount
+                    FROM
+                        INFORMATION_SCHEMA.COLUMNS
+                    WHERE
+                        TABLE_NAME = 'DataTransferConnections'
+                        AND COLUMN_NAME = 'ConnectionAccessLevel'";
+
+                using (var checkCommand = new SqlCommand(checkColumnsSql, connection))
+                {
+                    var result = await checkCommand.ExecuteScalarAsync();
+                    hasAccessLevelColumn = Convert.ToInt32(result) > 0;
+                }
+
+                checkColumnsSql = @"
+                    SELECT
+                        COUNT(*) AS ColumnCount
+                    FROM
+                        INFORMATION_SCHEMA.COLUMNS
+                    WHERE
+                        TABLE_NAME = 'DataTransferConnections'
+                        AND COLUMN_NAME = 'LastTestedOn'";
+
+                using (var checkCommand = new SqlCommand(checkColumnsSql, connection))
+                {
+                    var result = await checkCommand.ExecuteScalarAsync();
+                    hasLastTestedOnColumn = Convert.ToInt32(result) > 0;
+                }
+
                 if (connectionDto.ConnectionId > 0)
                 {
                     // Update existing connection
-                    string sql = @"
-                        UPDATE dbo.DataTransferConnections
-                        SET ConnectionName = @name,
-                            ConnectionString = @connString,
-                            Description = @description,
-                            IsSource = @isSource,
-                            IsDestination = @isDestination,
-                            IsActive = @isActive,
-                            LastModifiedOn = GETUTCDATE(),
-                            LastModifiedBy = @username
-                        WHERE ConnectionId = @id";
+                    string sql;
+
+                    if (hasAccessLevelColumn)
+                    {
+                        sql = @"
+                            UPDATE dbo.DataTransferConnections
+                            SET ConnectionName = @name,
+                                ConnectionString = @connString,
+                                Description = @description,
+                                ConnectionAccessLevel = @accessLevel,
+                                IsActive = @isActive,
+                                MaxPoolSize = @maxPoolSize,
+                                MinPoolSize = @minPoolSize,
+                                Timeout = @timeout,
+                                Encrypt = @encrypt,
+                                TrustServerCertificate = @trustServerCert,";
+
+                        if (hasLastTestedOnColumn && connectionDto.LastTestedOn.HasValue)
+                        {
+                            sql += @"
+                                LastTestedOn = @lastTestedOn,";
+                        }
+
+                        sql += @"
+                                LastModifiedOn = GETUTCDATE(),
+                                LastModifiedBy = @username
+                            WHERE ConnectionId = @id";
+                    }
+                    else
+                    {
+                        // Use old schema with IsSource and IsDestination
+                        sql = @"
+                            UPDATE dbo.DataTransferConnections
+                            SET ConnectionName = @name,
+                                ConnectionString = @connString,
+                                Description = @description,
+                                IsSource = @isSource,
+                                IsDestination = @isDestination,
+                                IsActive = @isActive,
+                                LastModifiedOn = GETUTCDATE(),
+                                LastModifiedBy = @username
+                            WHERE ConnectionId = @id";
+                    }
 
                     using (var command = new SqlCommand(sql, connection))
                     {
+                        // Hash the connection string for security if it's not already hashed
+                        string connectionStringToSave = connectionDto.ConnectionString;
+                        if (!_connectionStringHasher.IsConnectionStringHashed(connectionStringToSave))
+                        {
+                            connectionStringToSave = _connectionStringHasher.HashConnectionString(connectionStringToSave);
+                            _logger.LogInformation("Connection string hashed for security for connection {ConnectionName}", connectionDto.ConnectionName);
+                        }
+
                         command.Parameters.AddWithValue("@id", connectionDto.ConnectionId);
                         command.Parameters.AddWithValue("@name", connectionDto.ConnectionName);
-                        command.Parameters.AddWithValue("@connString", connectionDto.ConnectionString);
+                        command.Parameters.AddWithValue("@connString", connectionStringToSave);
                         command.Parameters.AddWithValue("@description", (object)connectionDto.Description ?? DBNull.Value);
-                        command.Parameters.AddWithValue("@isSource", connectionDto.IsSource);
-                        command.Parameters.AddWithValue("@isDestination", connectionDto.IsDestination);
                         command.Parameters.AddWithValue("@isActive", connectionDto.IsActive);
                         command.Parameters.AddWithValue("@username", username);
+                        command.Parameters.AddWithValue("@maxPoolSize", connectionDto.MaxPoolSize);
+                        command.Parameters.AddWithValue("@minPoolSize", connectionDto.MinPoolSize);
+                        command.Parameters.AddWithValue("@timeout", connectionDto.Timeout);
+                        command.Parameters.AddWithValue("@encrypt", connectionDto.Encrypt);
+                        command.Parameters.AddWithValue("@trustServerCert", connectionDto.TrustServerCertificate);
+
+                        if (hasAccessLevelColumn)
+                        {
+                            command.Parameters.AddWithValue("@accessLevel", connectionDto.ConnectionAccessLevel.ToString());
+
+                            if (hasLastTestedOnColumn && connectionDto.LastTestedOn.HasValue)
+                            {
+                                command.Parameters.AddWithValue("@lastTestedOn", connectionDto.LastTestedOn.Value);
+                            }
+                        }
+                        else
+                        {
+                            // Use legacy properties
+                            command.Parameters.AddWithValue("@isSource", connectionDto.IsSource);
+                            command.Parameters.AddWithValue("@isDestination", connectionDto.IsDestination);
+                        }
 
                         await command.ExecuteNonQueryAsync();
                         return connectionDto.ConnectionId;
@@ -329,22 +761,80 @@ namespace MCPServer.Core.Services.DataTransfer
                 else
                 {
                     // Insert new connection
-                    string sql = @"
-                        INSERT INTO dbo.DataTransferConnections
-                            (ConnectionName, ConnectionString, Description, IsSource, IsDestination, IsActive, CreatedBy, CreatedOn)
-                        VALUES
-                            (@name, @connString, @description, @isSource, @isDestination, @isActive, @username, GETUTCDATE());
-                        SELECT SCOPE_IDENTITY();";
+                    string sql;
+
+                    if (hasAccessLevelColumn)
+                    {
+                        sql = @"
+                            INSERT INTO dbo.DataTransferConnections
+                                (ConnectionName, ConnectionString, Description, ConnectionAccessLevel, IsActive,
+                                 MaxPoolSize, MinPoolSize, Timeout, Encrypt, TrustServerCertificate";
+
+                        if (hasLastTestedOnColumn && connectionDto.LastTestedOn.HasValue)
+                        {
+                            sql += ", LastTestedOn";
+                        }
+
+                        sql += @", CreatedBy, CreatedOn)
+                            VALUES
+                                (@name, @connString, @description, @accessLevel, @isActive,
+                                 @maxPoolSize, @minPoolSize, @timeout, @encrypt, @trustServerCert";
+
+                        if (hasLastTestedOnColumn && connectionDto.LastTestedOn.HasValue)
+                        {
+                            sql += ", @lastTestedOn";
+                        }
+
+                        sql += @", @username, GETUTCDATE());
+                            SELECT SCOPE_IDENTITY();";
+                    }
+                    else
+                    {
+                        // Use old schema with IsSource and IsDestination
+                        sql = @"
+                            INSERT INTO dbo.DataTransferConnections
+                                (ConnectionName, ConnectionString, Description, IsSource, IsDestination, IsActive, CreatedBy, CreatedOn)
+                            VALUES
+                                (@name, @connString, @description, @isSource, @isDestination, @isActive, @username, GETUTCDATE());
+                            SELECT SCOPE_IDENTITY();";
+                    }
 
                     using (var command = new SqlCommand(sql, connection))
                     {
+                        // Hash the connection string for security if it's not already hashed
+                        string connectionStringToSave = connectionDto.ConnectionString;
+                        if (!_connectionStringHasher.IsConnectionStringHashed(connectionStringToSave))
+                        {
+                            connectionStringToSave = _connectionStringHasher.HashConnectionString(connectionStringToSave);
+                            _logger.LogInformation("Connection string hashed for security for connection {ConnectionName}", connectionDto.ConnectionName);
+                        }
+
                         command.Parameters.AddWithValue("@name", connectionDto.ConnectionName);
-                        command.Parameters.AddWithValue("@connString", connectionDto.ConnectionString);
+                        command.Parameters.AddWithValue("@connString", connectionStringToSave);
                         command.Parameters.AddWithValue("@description", (object)connectionDto.Description ?? DBNull.Value);
-                        command.Parameters.AddWithValue("@isSource", connectionDto.IsSource);
-                        command.Parameters.AddWithValue("@isDestination", connectionDto.IsDestination);
                         command.Parameters.AddWithValue("@isActive", connectionDto.IsActive);
                         command.Parameters.AddWithValue("@username", username);
+                        command.Parameters.AddWithValue("@maxPoolSize", connectionDto.MaxPoolSize);
+                        command.Parameters.AddWithValue("@minPoolSize", connectionDto.MinPoolSize);
+                        command.Parameters.AddWithValue("@timeout", connectionDto.Timeout);
+                        command.Parameters.AddWithValue("@encrypt", connectionDto.Encrypt);
+                        command.Parameters.AddWithValue("@trustServerCert", connectionDto.TrustServerCertificate);
+
+                        if (hasAccessLevelColumn)
+                        {
+                            command.Parameters.AddWithValue("@accessLevel", connectionDto.ConnectionAccessLevel.ToString());
+
+                            if (hasLastTestedOnColumn && connectionDto.LastTestedOn.HasValue)
+                            {
+                                command.Parameters.AddWithValue("@lastTestedOn", connectionDto.LastTestedOn.Value);
+                            }
+                        }
+                        else
+                        {
+                            // Use legacy properties
+                            command.Parameters.AddWithValue("@isSource", connectionDto.IsSource);
+                            command.Parameters.AddWithValue("@isDestination", connectionDto.IsDestination);
+                        }
 
                         return Convert.ToInt32(await command.ExecuteScalarAsync());
                     }
@@ -1078,12 +1568,60 @@ namespace MCPServer.Core.Services.DataTransfer
     public class ConnectionDto
     {
         public int ConnectionId { get; set; }
-        public string ConnectionName { get; set; }
-        public string ConnectionString { get; set; }
-        public string Description { get; set; }
-        public bool IsSource { get; set; } = true;
-        public bool IsDestination { get; set; } = true;
+        public string ConnectionName { get; set; } = string.Empty;
+        public string ConnectionString { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
+        public ConnectionAccessLevel ConnectionAccessLevel { get; set; } = ConnectionAccessLevel.ReadWrite;
         public bool IsActive { get; set; } = true;
+        public DateTime? LastTestedOn { get; set; }
+        public DateTime CreatedOn { get; set; } = DateTime.UtcNow;
+        public string CreatedBy { get; set; } = "System";
+        public DateTime? LastModifiedOn { get; set; }
+        public string LastModifiedBy { get; set; } = string.Empty;
+        public int MaxPoolSize { get; set; } = 100;
+        public int MinPoolSize { get; set; } = 5;
+        public int Timeout { get; set; } = 30;
+        public bool Encrypt { get; set; } = true;
+        public bool TrustServerCertificate { get; set; } = true;
+
+        // Properties for UI display
+        public string ConnectionStringForDisplay { get; set; } = string.Empty;
+        public Dictionary<string, string>? ConnectionDetails { get; set; }
+
+        // Property for actual use in SQL connections (when the original is hashed)
+        public string ConnectionStringForUse { get; set; } = string.Empty;
+
+        // Legacy properties - kept for backward compatibility during transition
+        // These will be removed after all code is updated to use ConnectionAccessLevel
+        [Obsolete("Use ConnectionAccessLevel instead")]
+        public bool IsSource
+        {
+            get => ConnectionAccessLevel == ConnectionAccessLevel.ReadOnly || ConnectionAccessLevel == ConnectionAccessLevel.ReadWrite;
+            set
+            {
+                if (value && !IsDestination)
+                    ConnectionAccessLevel = ConnectionAccessLevel.ReadOnly;
+                else if (value && IsDestination)
+                    ConnectionAccessLevel = ConnectionAccessLevel.ReadWrite;
+                else if (!value && IsDestination)
+                    ConnectionAccessLevel = ConnectionAccessLevel.WriteOnly;
+            }
+        }
+
+        [Obsolete("Use ConnectionAccessLevel instead")]
+        public bool IsDestination
+        {
+            get => ConnectionAccessLevel == ConnectionAccessLevel.WriteOnly || ConnectionAccessLevel == ConnectionAccessLevel.ReadWrite;
+            set
+            {
+                if (value && !IsSource)
+                    ConnectionAccessLevel = ConnectionAccessLevel.WriteOnly;
+                else if (value && IsSource)
+                    ConnectionAccessLevel = ConnectionAccessLevel.ReadWrite;
+                else if (!value && IsSource)
+                    ConnectionAccessLevel = ConnectionAccessLevel.ReadOnly;
+            }
+        }
     }
 
     public class TableMappingDto

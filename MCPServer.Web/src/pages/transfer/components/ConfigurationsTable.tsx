@@ -4,12 +4,14 @@ import {
   Chip,
   IconButton,
   Box,
+  Tooltip,
 } from '@mui/material';
 import { DataGrid } from '@mui/x-data-grid';
 import {
   Edit as EditIcon,
   PlayArrow as PlayArrowIcon,
-  History as HistoryIcon
+  History as HistoryIcon,
+  CheckCircle as CheckCircleIcon
 } from '@mui/icons-material';
 
 export default function ConfigurationsTable({
@@ -17,6 +19,7 @@ export default function ConfigurationsTable({
   connections,
   onEdit,
   onExecute,
+  onTest,
   onViewHistory,
   isLoading
 }) {
@@ -58,33 +61,45 @@ export default function ConfigurationsTable({
     {
       field: 'actions',
       headerName: 'Actions',
-      width: 180,
+      width: 220,
       renderCell: (params) => (
         <Box>
-          <IconButton
-            color="primary"
-            onClick={() => onEdit(params.row)}
-            title="Edit"
-            size="small"
-          >
-            <EditIcon />
-          </IconButton>
-          <IconButton
-            color="success"
-            onClick={() => onExecute(params.row.configurationId)}
-            title="Execute"
-            size="small"
-          >
-            <PlayArrowIcon />
-          </IconButton>
-          <IconButton
-            color="info"
-            onClick={() => onViewHistory(params.row.configurationId)}
-            title="History"
-            size="small"
-          >
-            <HistoryIcon />
-          </IconButton>
+          <Tooltip title="Edit">
+            <IconButton
+              color="primary"
+              onClick={() => onEdit(params.row)}
+              size="small"
+            >
+              <EditIcon />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Test Connections">
+            <IconButton
+              color="secondary"
+              onClick={() => onTest(params.row.configurationId)}
+              size="small"
+            >
+              <CheckCircleIcon />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Execute Transfer">
+            <IconButton
+              color="success"
+              onClick={() => onExecute(params.row.configurationId)}
+              size="small"
+            >
+              <PlayArrowIcon />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="View History">
+            <IconButton
+              color="info"
+              onClick={() => onViewHistory(params.row.configurationId)}
+              size="small"
+            >
+              <HistoryIcon />
+            </IconButton>
+          </Tooltip>
         </Box>
       ),
     },

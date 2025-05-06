@@ -1,7 +1,7 @@
 // Configuration file for API settings and other environment variables
 
 // API Base URL - updated to use port 2000 instead of 5000
-export const API_BASE_URL = 'http://localhost:2000/api';
+export const API_BASE_URL = 'http://localhost:2000';
 
 // Other global configuration constants can be added here
 export const AUTH_STORAGE_KEY = 'auth_token';
