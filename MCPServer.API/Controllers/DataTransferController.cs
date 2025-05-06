@@ -28,53 +28,10 @@ namespace MCPServer.API.Controllers
             _dataTransferService = dataTransferService;
             _logger = logger;
 
-            try
-            {
-                // Get the connection string template
-                string connectionStringTemplate = configuration.GetConnectionString("ProgressPlayDB") ??
-                    throw new ArgumentNullException(nameof(configuration), "ProgressPlayDB connection string is not configured");
+            // For development, use direct connection string with credentials
+            _connectionString = "Server=tcp:progressplay-server.database.windows.net,1433;Initial Catalog=ProgressPlayDB;User ID=pp-sa;Password=RDlS8C6zVewS-wJOr4_oY5Y;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;";
 
-                // Get Azure Key Vault credentials
-                string keyVaultName = "progressplaymcp-kv";
-                string keyVaultUri = $"https://{keyVaultName}.vault.azure.net/";
-
-                // Create a SecretClient using the DefaultAzureCredential
-                var secretClient = new SecretClient(new Uri(keyVaultUri), new DefaultAzureCredential());
-
-                // Retrieve secrets from Key Vault
-                KeyVaultSecret usernameSecret = secretClient.GetSecret("ProgressPlayDBAzure--Username");
-                KeyVaultSecret passwordSecret = secretClient.GetSecret("ProgressPlayDBAzure--Password");
-
-                string username = usernameSecret.Value;
-                string password = passwordSecret.Value;
-
-                _logger.LogInformation("Retrieved credentials from Azure Key Vault for ProgressPlayDB");
-
-                // Replace placeholders with actual credentials from Key Vault
-                _connectionString = connectionStringTemplate
-                    .Replace("{vault_username}", username)
-                    .Replace("{vault_password}", password);
-
-                _logger.LogInformation("Connection string configured for ProgressPlayDB with Key Vault credentials");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error retrieving credentials from Azure Key Vault. Using fallback credentials.");
-
-                // Fallback to template connection string with default credentials for development
-                string connectionStringTemplate = configuration.GetConnectionString("ProgressPlayDB") ??
-                    throw new ArgumentNullException(nameof(configuration), "ProgressPlayDB connection string is not configured");
-
-                // Use fallback credentials
-                string username = "pp-sa";
-                string password = "RDlS8***********_oY5Y";
-
-                _connectionString = connectionStringTemplate
-                    .Replace("{vault_username}", username)
-                    .Replace("{vault_password}", password);
-
-                _logger.LogInformation("Connection string configured with fallback credentials");
-            }
+            _logger.LogInformation("Connection string configured for ProgressPlayDB with development credentials");
         }
 
         [HttpGet("configurations")]

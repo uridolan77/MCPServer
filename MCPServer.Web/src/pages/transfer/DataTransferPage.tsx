@@ -159,8 +159,15 @@ export default function DataTransferPage() {
   const loadConfigurations = async () => {
     try {
       const response = await DataTransferService.getConfigurations();
-      setConfigurations(response.data);
-      return response.data;
+      // Check if the response has a $values property (API response format)
+      if (response && response.$values) {
+        setConfigurations(response.$values);
+        return response.$values;
+      } else {
+        console.error('Unexpected response format:', response);
+        setConfigurations([]);
+        return [];
+      }
     } catch (error) {
       console.error('Error loading configurations:', error);
       showSnackbar('Error loading configurations', 'error');
@@ -171,8 +178,15 @@ export default function DataTransferPage() {
   const loadConnections = async () => {
     try {
       const response = await DataTransferService.getConnections();
-      setConnections(response.data);
-      return response.data;
+      // Check if the response has a $values property (API response format)
+      if (response && response.$values) {
+        setConnections(response.$values);
+        return response.$values;
+      } else {
+        console.error('Unexpected response format:', response);
+        setConnections([]);
+        return [];
+      }
     } catch (error) {
       console.error('Error loading connections:', error);
       showSnackbar('Error loading connections', 'error');
@@ -183,8 +197,15 @@ export default function DataTransferPage() {
   const loadRunHistory = async (configId: number = 0) => {
     try {
       const response = await DataTransferService.getRunHistory(configId);
-      setRunHistory(response.data);
-      return response.data;
+      // Check if the response has a $values property (API response format)
+      if (response && response.$values) {
+        setRunHistory(response.$values);
+        return response.$values;
+      } else {
+        console.error('Unexpected response format:', response);
+        setRunHistory([]);
+        return [];
+      }
     } catch (error) {
       console.error('Error loading run history:', error);
       showSnackbar('Error loading run history', 'error');
