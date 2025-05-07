@@ -17,8 +17,19 @@ namespace MCPServer.Core.Features.DataTransfer.Models
         public string CustomWhere { get; set; }
         public string OrderBy { get; set; }
         public int TopN { get; set; }
-        public List<ColumnMapping> ColumnMappings { get; set; } = new List<ColumnMapping>();
         public BulkCopyOptions BulkCopyOptions { get; set; }
+
+        // Allow ColumnMappings to be set programmatically
+        public List<ColumnMapping> ColumnMappings { get; set; } = new List<ColumnMapping>();
+
+        // Add a property for additional bulk copy options that would be used with identical mapping
+        public BulkCopyOptions AutoBulkCopyOptions { get; set; } = new BulkCopyOptions
+        {
+            KeepIdentity = true,
+            KeepNulls = true,
+            TableLock = false,
+            Timeout = 600
+        };
     }
 
     public class ColumnMapping

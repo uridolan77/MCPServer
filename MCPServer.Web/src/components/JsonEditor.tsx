@@ -1,5 +1,298 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { ChevronDown, ChevronRight, Plus, Trash2, Edit, Save, X, Copy, Clipboard, FileText, Code, Check, Info, AlertCircle } from 'lucide-react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { ChevronDown, ChevronRight, Plus, Trash2, Edit, Save, X, Copy, Clipboard, FileText, Code, Check, Info, AlertCircle, Box, LayoutGrid, ZoomIn, ZoomOut, Maximize } from 'lucide-react';
+
+// Entity Relationship Diagram Component
+const EntityRelationshipDiagram = ({ jsonData, setSelectedPath }) => {
+  const containerRef = useRef(null);
+  const [scale, setScale] = useState(1);
+  const [position, setPosition] = useState({ x: 0, y: 0 });
+  const [dragging, setDragging] = useState(false);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const [entityPositions, setEntityPositions] = useState({});
+  
+  // Extract entities and relationships from the JSON data
+  const extractEntitiesAndRelationships = useCallback(() => {
+    let entities = [];
+    let relationships = [];
+    
+    if (jsonData.entities && Array.isArray(jsonData.entities)) {
+      entities = jsonData.entities;
+    }
+    
+    if (jsonData.relationships && Array.isArray(jsonData.relationships)) {
+      relationships = jsonData.relationships;
+    }
+    
+    return { entities, relationships };
+  }, [jsonData]);
+  
+  const { entities, relationships } = extractEntitiesAndRelationships();
+  
+  // Initialize entity positions
+  useEffect(() => {
+    if (entities.length > 0 && Object.keys(entityPositions).length === 0) {
+      // Simple grid layout
+      const positions = {};
+      const cols = Math.ceil(Math.sqrt(entities.length));
+      const spacing = 250;
+      
+      entities.forEach((entity, index) => {
+        const row = Math.floor(index / cols);
+        const col = index % cols;
+        positions[entity.name || entity.id] = {
+          x: col * spacing,
+          y: row * spacing
+        };
+      });
+      
+      setEntityPositions(positions);
+    }
+  }, [entities, entityPositions]);
+  
+  // Handle mouse events for dragging the canvas
+  const handleMouseDown = (e) => {
+    if (e.target === containerRef.current) {
+      setDragging(true);
+      setDragStart({ x: e.clientX, y: e.clientY });
+    }
+  };
+  
+  const handleMouseMove = (e) => {
+    if (dragging) {
+      const dx = e.clientX - dragStart.x;
+      const dy = e.clientY - dragStart.y;
+      
+      setPosition({
+        x: position.x + dx,
+        y: position.y + dy
+      });
+      
+      setDragStart({ x: e.clientX, y: e.clientY });
+    }
+  };
+  
+  const handleMouseUp = () => {
+    setDragging(false);
+  };
+  
+  // Handle entity drag
+  const handleEntityDragStart = (e, entityName) => {
+    e.stopPropagation();
+    e.dataTransfer.setData('entityName', entityName);
+  };
+  
+  const handleEntityDragOver = (e) => {
+    e.preventDefault();
+  };
+  
+  const handleEntityDrop = (e) => {
+    e.preventDefault();
+    const entityName = e.dataTransfer.getData('entityName');
+    
+    if (entityName) {
+      const rect = containerRef.current.getBoundingClientRect();
+      const x = (e.clientX - rect.left - position.x) / scale;
+      const y = (e.clientY - rect.top - position.y) / scale;
+      
+      setEntityPositions(prev => ({
+        ...prev,
+        [entityName]: { x, y }
+      }));
+    }
+  };
+  
+  // Zoom functions
+  const zoomIn = () => {
+    setScale(prev => Math.min(prev + 0.1, 2.0));
+  };
+  
+  const zoomOut = () => {
+    setScale(prev => Math.max(prev - 0.1, 0.5));
+  };
+  
+  const resetView = () => {
+    setScale(1);
+    setPosition({ x: 0, y: 0 });
+  };
+  
+  // Expose methods to parent component
+  useEffect(() => {
+    if (containerRef.current) {
+      containerRef.current.zoomIn = zoomIn;
+      containerRef.current.zoomOut = zoomOut;
+      containerRef.current.resetView = resetView;
+      containerRef.current.classList.add('entity-diagram');
+    }
+    
+    return () => {
+      if (containerRef.current) {
+        delete containerRef.current.zoomIn;
+        delete containerRef.current.zoomOut;
+        delete containerRef.current.resetView;
+        containerRef.current.classList.remove('entity-diagram');
+      }
+    };
+  }, []);
+  
+  // Find relationships for an entity
+  const getEntityRelationships = (entityName) => {
+    return relationships.filter(rel => {
+      const domain = rel.domain || rel.source;
+      const range = rel.range || rel.target;
+      return domain === entityName || range === entityName;
+    });
+  };
+  
+  // Handle entity selection
+  const handleEntityClick = (entity) => {
+    const path = `entities.${entities.indexOf(entity)}`;
+    setSelectedPath(path);
+  };
+  
+  // Draw relationship lines
+  const renderRelationshipLines = () => {
+    return relationships.map((rel, index) => {
+      const sourceName = rel.domain || rel.source;
+      const targetName = rel.range || rel.target;
+      
+      const sourcePosition = entityPositions[sourceName];
+      const targetPosition = entityPositions[targetName];
+      
+      if (!sourcePosition || !targetPosition) return null;
+      
+      // Calculate line coordinates
+      const sourceX = sourcePosition.x + 150; // Half entity width
+      const sourceY = sourcePosition.y + 100; // Entity height
+      const targetX = targetPosition.x + 150; // Half entity width
+      const targetY = targetPosition.y;
+      
+      // Line path with arrow
+      const path = `M${sourceX},${sourceY} C${sourceX},${sourceY + 50} ${targetX},${targetY - 50} ${targetX},${targetY}`;
+      
+      return (
+        <g key={`rel-${index}`} className="relationship-line">
+          <path 
+            d={path} 
+            fill="none" 
+            stroke="#6B7280" 
+            strokeWidth="2" 
+            markerEnd="url(#arrowhead)" 
+          />
+          
+          {/* Relationship label */}
+          <text 
+            x={(sourceX + targetX) / 2} 
+            y={(sourceY + targetY) / 2 - 10}
+            textAnchor="middle"
+            fill="#4B5563"
+            fontSize="12"
+            className="bg-white px-1"
+          >
+            {rel.label || rel.name}
+          </text>
+        </g>
+      );
+    });
+  };
+  
+  if (entities.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="text-gray-500">
+          No entities found in the JSON structure
+        </div>
+      </div>
+    );
+  }
+  
+  return (
+    <div 
+      ref={containerRef}
+      className="relative w-full h-full cursor-grab overflow-auto"
+      onMouseDown={handleMouseDown}
+      onMouseMove={handleMouseMove}
+      onMouseUp={handleMouseUp}
+      onMouseLeave={handleMouseUp}
+      onDragOver={handleEntityDragOver}
+      onDrop={handleEntityDrop}
+      style={{ 
+        backgroundImage: 'radial-gradient(circle, #e5e7eb 1px, transparent 1px)',
+        backgroundSize: '20px 20px',
+      }}
+    >
+      <div 
+        className="absolute transform origin-top-left"
+        style={{ 
+          transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
+          minWidth: '3000px',
+          minHeight: '2000px'
+        }}
+      >
+        <svg className="absolute top-0 left-0 w-full h-full pointer-events-none">
+          <defs>
+            <marker
+              id="arrowhead"
+              viewBox="0 0 10 10"
+              refX="9"
+              refY="5"
+              markerWidth="6"
+              markerHeight="6"
+              orient="auto"
+            >
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="#6B7280" />
+            </marker>
+          </defs>
+          {renderRelationshipLines()}
+        </svg>
+        
+        {/* Entities */}
+        {entities.map((entity, index) => {
+          const entityName = entity.name || entity.id;
+          const position = entityPositions[entityName] || { x: 0, y: 0 };
+          const entityRelationships = getEntityRelationships(entityName);
+          
+          return (
+            <div
+              key={`entity-${index}`}
+              className="absolute bg-white border-2 border-blue-500 rounded-lg shadow-md w-72 cursor-pointer overflow-hidden"
+              style={{ 
+                left: `${position.x}px`, 
+                top: `${position.y}px`,
+              }}
+              draggable
+              onDragStart={(e) => handleEntityDragStart(e, entityName)}
+              onClick={() => handleEntityClick(entity)}
+            >
+              <div className="bg-blue-500 text-white font-bold p-2 text-center">
+                {entityName}
+              </div>
+              
+              <div className="p-2 max-h-60 overflow-y-auto">
+                {/* Properties */}
+                {entity.properties && entity.properties.map((prop, propIndex) => (
+                  <div key={`prop-${propIndex}`} className="text-sm mb-1 pb-1 border-b border-gray-200">
+                    <div className="font-medium">{prop.name}</div>
+                    <div className="text-xs text-gray-600">
+                      {prop.type}
+                      {prop.required && <span className="text-red-600 ml-1">*</span>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              
+              {/* Relationship count indicator */}
+              {entityRelationships.length > 0 && (
+                <div className="absolute top-2 right-2 bg-gray-700 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs">
+                  {entityRelationships.length}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
 
 // Main component
 const JSONStructureEditor = () => {
@@ -10,7 +303,7 @@ const JSONStructureEditor = () => {
   const [editValue, setEditValue] = useState('');
   const [error, setError] = useState(null);
   const [jsonText, setJsonText] = useState('');
-  const [viewMode, setViewMode] = useState('tree'); // tree or text
+  const [viewMode, setViewMode] = useState('tree'); // tree, text, or visual
   const [clipboard, setClipboard] = useState(null);
   const [notification, setNotification] = useState(null);
   const [schemaValidation, setSchemaValidation] = useState(true);
@@ -556,11 +849,18 @@ const JSONStructureEditor = () => {
                 Tree
               </button>
               <button 
-                className={`px-3 py-2 flex items-center ${viewMode === 'text' ? 'bg-blue-500 text-white rounded-r' : 'text-gray-700'}`}
+                className={`px-3 py-2 flex items-center ${viewMode === 'text' ? 'bg-blue-500 text-white' : 'text-gray-700'}`}
                 onClick={() => setViewMode('text')}
               >
                 <Code size={16} className="mr-1" />
                 Text
+              </button>
+              <button 
+                className={`px-3 py-2 flex items-center ${viewMode === 'visual' ? 'bg-blue-500 text-white rounded-r' : 'text-gray-700'}`}
+                onClick={() => setViewMode('visual')}
+              >
+                <LayoutGrid size={16} className="mr-1" />
+                Visual
               </button>
             </div>
           </div>
@@ -646,7 +946,7 @@ const JSONStructureEditor = () => {
               )}
             </div>
           </div>
-        ) : (
+        ) : viewMode === 'text' ? (
           <div className="flex-1 overflow-auto p-4">
             {/* Text View */}
             <div className="bg-white rounded-lg shadow h-full flex flex-col">
@@ -669,6 +969,70 @@ const JSONStructureEditor = () => {
                 >
                   Update
                 </button>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="flex-1 overflow-auto p-4">
+            {/* Visual Entity-Relationship View */}
+            <div className="bg-white rounded-lg shadow h-full flex flex-col">
+              {error && (
+                <div className="bg-red-100 text-red-800 p-2 m-4 rounded">
+                  {error}
+                </div>
+              )}
+              
+              <div className="p-4 flex space-x-2 border-b">
+                <button 
+                  className="px-3 py-1 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 flex items-center"
+                  title="Zoom In"
+                  onClick={() => {
+                    const diagram = document.querySelector('.entity-diagram');
+                    if (diagram) {
+                      diagram.zoomIn();
+                    }
+                  }}
+                >
+                  <ZoomIn size={16} />
+                </button>
+                <button 
+                  className="px-3 py-1 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 flex items-center"
+                  title="Zoom Out"
+                  onClick={() => {
+                    const diagram = document.querySelector('.entity-diagram');
+                    if (diagram) {
+                      diagram.zoomOut();
+                    }
+                  }}
+                >
+                  <ZoomOut size={16} />
+                </button>
+                <button 
+                  className="px-3 py-1 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 flex items-center"
+                  title="Reset View"
+                  onClick={() => {
+                    const diagram = document.querySelector('.entity-diagram');
+                    if (diagram) {
+                      diagram.resetView();
+                    }
+                  }}
+                >
+                  <Maximize size={16} />
+                </button>
+              </div>
+              
+              <div className="flex-1 overflow-auto p-4">
+                <div className="bg-blue-50 border-blue-200 border p-3 mb-4 rounded text-sm">
+                  <h3 className="font-bold mb-1">Entity-Relationship Diagram</h3>
+                  <p>This view shows entities as boxes and their relationships as connecting lines. You can:</p>
+                  <ul className="list-disc ml-5 mt-1">
+                    <li>Drag entities to rearrange them</li>
+                    <li>Click an entity to select it in the editor</li>
+                    <li>Use mouse wheel or zoom buttons to zoom in/out</li>
+                    <li>Drag the background to pan the view</li>
+                  </ul>
+                </div>
+                <EntityRelationshipDiagram jsonData={jsonData} setSelectedPath={setSelectedPath} />
               </div>
             </div>
           </div>

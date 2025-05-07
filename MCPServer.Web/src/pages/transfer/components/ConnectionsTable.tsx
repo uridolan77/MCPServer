@@ -102,17 +102,6 @@ export default function ConnectionsTable({ connections, onEdit, onTest, isLoadin
       },
     },
     {
-      field: 'createdOn',
-      headerName: 'Created On',
-      width: 180,
-      valueGetter: (params: GridValueGetterParams<any, Connection>) => {
-        return params.row.createdOn ? new Date(params.row.createdOn) : null;
-      },
-      valueFormatter: (params: GridValueFormatterParams) => {
-        return params.value ? params.value.toLocaleString() : '';
-      },
-    },
-    {
       field: 'lastModifiedOn',
       headerName: 'Last Modified',
       width: 180,
@@ -121,38 +110,6 @@ export default function ConnectionsTable({ connections, onEdit, onTest, isLoadin
       },
       valueFormatter: (params: GridValueFormatterParams) => {
         return params.value ? params.value.toLocaleString() : '';
-      },
-    },
-    {
-      field: 'lastTestedOn',
-      headerName: 'Last Tested',
-      width: 180,
-      valueGetter: (params: GridValueGetterParams<any, Connection>) => {
-        return params.row.lastTestedOn ? new Date(params.row.lastTestedOn) : null;
-      },
-      valueFormatter: (params: GridValueFormatterParams) => {
-        return params.value ? params.value.toLocaleString() : 'Never';
-      },
-    },
-    {
-      field: 'serverInfo',
-      headerName: 'Server',
-      width: 250,
-      valueGetter: (params: GridValueGetterParams<any, Connection>) => {
-        // If we have connection details, use the server from there
-        if (params.row.connectionDetails?.server) {
-          return `Server=${params.row.connectionDetails.server}`;
-        }
-
-        // Otherwise try to extract from connection string
-        if (!params.row.connectionString) return '';
-
-        // Use connectionStringForDisplay if available (for hashed strings)
-        const str = (params.row.connectionStringForDisplay || params.row.connectionString) as string;
-
-        // Show only the server part
-        const serverPart = str.match(/Server=([^;]+)/i);
-        return serverPart ? serverPart[0] : '[Unknown]';
       },
     },
     {

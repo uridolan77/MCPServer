@@ -19,6 +19,7 @@ namespace MCPServer.Core.Features.DataTransfer.Services
         private readonly ILogger<DataMigrationService> _logger;
         private readonly string _sourceConnectionString;
         private readonly string _targetConnectionString;
+        private readonly bool _identicalSourceAndTarget;
         private List<TableMapping> _tableMappings;
         private readonly int _batchSize;
         private readonly int _commandTimeout;
@@ -29,13 +30,14 @@ namespace MCPServer.Core.Features.DataTransfer.Services
         private bool _isDryRun = false;
         private List<string> _tableFilter;
 
+
         public DataMigrationService(IConfiguration config, ILogger<DataMigrationService> logger)
         {
             _config = config;
             _logger = logger;
             _sourceConnectionString = config.GetConnectionString("DataTransfer:Source");
             _targetConnectionString = config.GetConnectionString("DataTransfer:Target");
-            
+            _identicalSourceAndTarget = config.GetValue<bool>("Settings:IdenticalSourceAndTarget", false);
             // Load table mappings from configuration
             _tableMappings = config.GetSection("DataTransfer:TableMappings").Get<List<TableMapping>>();
             
@@ -130,10 +132,71 @@ namespace MCPServer.Core.Features.DataTransfer.Services
             _monitor.EndMigration();
         }
 
+        // Modified method to handle retrieving or auto-generating column mappings
+        private async Task<List<ColumnMapping>> GetColumnMappingsAsync(TableMapping mapping)
+        {
+            // If column mappings are already defined and we're not using identical mode, return them
+            if (mapping.ColumnMappings?.Count > 0 && !_identicalSourceAndTarget)
+            {
+                return mapping.ColumnMappings;
+            }
+
+            // If we're in identical mode or no column mappings defined, auto-generate them
+            await using var sourceConnection = new SqlConnection(_sourceConnectionString);
+            await sourceConnection.OpenAsync();
+
+            var query = @"
+            SELECT 
+                COLUMN_NAME, 
+                DATA_TYPE,
+                CHARACTER_MAXIMUM_LENGTH,
+                IS_NULLABLE
+            FROM INFORMATION_SCHEMA.COLUMNS 
+            WHERE TABLE_SCHEMA = @Schema 
+            AND TABLE_NAME = @TableName
+            ORDER BY ORDINAL_POSITION";
+
+            await using var command = new SqlCommand(query, sourceConnection);
+            command.Parameters.AddWithValue("@Schema", mapping.SourceSchema);
+            command.Parameters.AddWithValue("@TableName", mapping.SourceTable);
+
+            var columnMappings = new List<ColumnMapping>();
+
+            await using var reader = await command.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+            {
+                var columnName = reader.GetString(0);
+                var dataType = reader.GetString(1);
+                var maxLength = reader.IsDBNull(2) ? null : (int?)reader.GetInt32(2);
+                var isNullable = reader.GetString(3) == "YES";
+
+                var columnMapping = new ColumnMapping
+                {
+                    SourceColumn = columnName,
+                    TargetColumn = columnName, // Same name for identical mapping
+                    DataType = dataType,
+                    AllowNull = isNullable
+                };
+
+                columnMappings.Add(columnMapping);
+            }
+
+            return columnMappings;
+        }
+
         private async Task MigrateTableAsync(TableMapping mapping)
         {
             _logger.LogInformation($"Starting migration for table {mapping.SourceTable} to {mapping.TargetTable}");
             _monitor.StartTableMigration(mapping.SourceTable);
+
+            // Get column mappings (auto-generated if needed)
+            var columnMappings = await GetColumnMappingsAsync(mapping);
+
+            // If we're using identical mode, ensure the mapping's ColumnMappings is set
+            if (_identicalSourceAndTarget)
+            {
+                mapping.ColumnMappings = columnMappings;
+            }
 
             // Get the last migration timestamp or ID
             var lastValue = GetLastMigrationValue(mapping);

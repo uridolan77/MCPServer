@@ -1,9 +1,10 @@
 using System;
 using System.Collections.Generic;
-using System.Data.SqlClient;
+using Microsoft.Data.SqlClient; // Changed from System.Data.SqlClient to Microsoft.Data.SqlClient
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using MCPServer.Core.Services.Interfaces; // Added for IConnectionStringResolverService
 
 namespace MCPServer.Core.Services.DataTransfer
 {
@@ -30,12 +31,15 @@ namespace MCPServer.Core.Services.DataTransfer
     public class DataTransferService
     {
         private readonly ILogger<DataTransferService> _logger;
-        private readonly ConnectionStringHasher _connectionStringHasher;
+        private readonly IConnectionStringResolverService _connectionStringResolverService; // Added
 
-        public DataTransferService(ILogger<DataTransferService> logger, ConnectionStringHasher connectionStringHasher)
+        // Constructor updated to inject IConnectionStringResolverService
+        public DataTransferService(
+            ILogger<DataTransferService> logger, 
+            IConnectionStringResolverService connectionStringResolverService) // Added
         {
-            _logger = logger;
-            _connectionStringHasher = connectionStringHasher;
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _connectionStringResolverService = connectionStringResolverService ?? throw new ArgumentNullException(nameof(connectionStringResolverService)); // Added
         }
 
         public async Task<List<DataTransferConfigurationDto>> GetAllConfigurationsAsync(string connectionString)
@@ -337,23 +341,18 @@ namespace MCPServer.Core.Services.DataTransfer
                     {
                         if (await reader.ReadAsync())
                         {
-                            string rawConnectionString = reader.GetString(reader.GetOrdinal("ConnectionString"));
+                            // Get the connection string directly - it's either a template with Key Vault placeholders
+                            // or a direct connection string
+                            string connectionStringValue = reader.GetString(reader.GetOrdinal("ConnectionString"));
 
                             var connectionDto = new ConnectionDto
                             {
                                 ConnectionId = reader.GetInt32(reader.GetOrdinal("ConnectionId")),
                                 ConnectionName = reader.GetString(reader.GetOrdinal("ConnectionName")),
-                                ConnectionString = rawConnectionString,
+                                ConnectionString = connectionStringValue,
                                 Description = reader.IsDBNull(reader.GetOrdinal("Description")) ? string.Empty : reader.GetString(reader.GetOrdinal("Description")),
                                 IsActive = reader.GetBoolean(reader.GetOrdinal("IsActive"))
                             };
-
-                            // If the connection string is hashed, create a dummy connection string for UI display
-                            if (_connectionStringHasher.IsConnectionStringHashed(rawConnectionString))
-                            {
-                                connectionDto.ConnectionStringForDisplay = _connectionStringHasher.CreateDummyConnectionString(rawConnectionString);
-                                connectionDto.ConnectionDetails = _connectionStringHasher.ExtractConnectionDetails(rawConnectionString);
-                            }
 
                             if (hasAccessLevelColumn)
                             {
@@ -528,23 +527,18 @@ namespace MCPServer.Core.Services.DataTransfer
                     {
                         while (await reader.ReadAsync())
                         {
-                            string rawConnectionString = reader.GetString(reader.GetOrdinal("ConnectionString"));
+                            // Get the connection string directly - it's either a template with Key Vault placeholders
+                            // or a direct connection string
+                            string connectionStringValue = reader.GetString(reader.GetOrdinal("ConnectionString"));
 
                             var connectionDto = new ConnectionDto
                             {
                                 ConnectionId = reader.GetInt32(reader.GetOrdinal("ConnectionId")),
                                 ConnectionName = reader.GetString(reader.GetOrdinal("ConnectionName")),
-                                ConnectionString = rawConnectionString,
+                                ConnectionString = connectionStringValue,
                                 Description = reader.IsDBNull(reader.GetOrdinal("Description")) ? string.Empty : reader.GetString(reader.GetOrdinal("Description")),
                                 IsActive = reader.GetBoolean(reader.GetOrdinal("IsActive"))
                             };
-
-                            // If the connection string is hashed, create a dummy connection string for UI display
-                            if (_connectionStringHasher.IsConnectionStringHashed(rawConnectionString))
-                            {
-                                connectionDto.ConnectionStringForDisplay = _connectionStringHasher.CreateDummyConnectionString(rawConnectionString);
-                                connectionDto.ConnectionDetails = _connectionStringHasher.ExtractConnectionDetails(rawConnectionString);
-                            }
 
                             if (hasAccessLevelColumn)
                             {
@@ -718,13 +712,10 @@ namespace MCPServer.Core.Services.DataTransfer
 
                     using (var command = new SqlCommand(sql, connection))
                     {
-                        // Hash the connection string for security if it's not already hashed
+                        // The ConnectionString will be saved as-is (either a template with Key Vault placeholders 
+                        // or a direct connection string)
                         string connectionStringToSave = connectionDto.ConnectionString;
-                        if (!_connectionStringHasher.IsConnectionStringHashed(connectionStringToSave))
-                        {
-                            connectionStringToSave = _connectionStringHasher.HashConnectionString(connectionStringToSave);
-                            _logger.LogInformation("Connection string hashed for security for connection {ConnectionName}", connectionDto.ConnectionName);
-                        }
+                        _logger.LogInformation("Saving connection string for {ConnectionName}", connectionDto.ConnectionName);
 
                         command.Parameters.AddWithValue("@id", connectionDto.ConnectionId);
                         command.Parameters.AddWithValue("@name", connectionDto.ConnectionName);
@@ -750,8 +741,8 @@ namespace MCPServer.Core.Services.DataTransfer
                         else
                         {
                             // Use legacy properties
-                            command.Parameters.AddWithValue("@isSource", connectionDto.IsSource);
-                            command.Parameters.AddWithValue("@isDestination", connectionDto.IsDestination);
+                            command.Parameters.AddWithValue("@isSource", connectionDto.ConnectionAccessLevel == ConnectionAccessLevel.ReadOnly || connectionDto.ConnectionAccessLevel == ConnectionAccessLevel.ReadWrite);
+                            command.Parameters.AddWithValue("@isDestination", connectionDto.ConnectionAccessLevel == ConnectionAccessLevel.WriteOnly || connectionDto.ConnectionAccessLevel == ConnectionAccessLevel.ReadWrite);
                         }
 
                         await command.ExecuteNonQueryAsync();
@@ -801,13 +792,10 @@ namespace MCPServer.Core.Services.DataTransfer
 
                     using (var command = new SqlCommand(sql, connection))
                     {
-                        // Hash the connection string for security if it's not already hashed
+                        // The ConnectionString will be saved as-is (either a template with Key Vault placeholders 
+                        // or a direct connection string)
                         string connectionStringToSave = connectionDto.ConnectionString;
-                        if (!_connectionStringHasher.IsConnectionStringHashed(connectionStringToSave))
-                        {
-                            connectionStringToSave = _connectionStringHasher.HashConnectionString(connectionStringToSave);
-                            _logger.LogInformation("Connection string hashed for security for connection {ConnectionName}", connectionDto.ConnectionName);
-                        }
+                        _logger.LogInformation("Saving connection string for {ConnectionName}", connectionDto.ConnectionName);
 
                         command.Parameters.AddWithValue("@name", connectionDto.ConnectionName);
                         command.Parameters.AddWithValue("@connString", connectionStringToSave);
@@ -832,8 +820,8 @@ namespace MCPServer.Core.Services.DataTransfer
                         else
                         {
                             // Use legacy properties
-                            command.Parameters.AddWithValue("@isSource", connectionDto.IsSource);
-                            command.Parameters.AddWithValue("@isDestination", connectionDto.IsDestination);
+                            command.Parameters.AddWithValue("@isSource", connectionDto.ConnectionAccessLevel == ConnectionAccessLevel.ReadOnly || connectionDto.ConnectionAccessLevel == ConnectionAccessLevel.ReadWrite);
+                            command.Parameters.AddWithValue("@isDestination", connectionDto.ConnectionAccessLevel == ConnectionAccessLevel.WriteOnly || connectionDto.ConnectionAccessLevel == ConnectionAccessLevel.ReadWrite);
                         }
 
                         return Convert.ToInt32(await command.ExecuteScalarAsync());
@@ -1144,6 +1132,26 @@ namespace MCPServer.Core.Services.DataTransfer
             {
                 throw new ArgumentException($"Configuration with ID {configurationId} not found");
             }
+            if (config.SourceConnection == null)
+            {
+                throw new InvalidOperationException($"Source connection for configuration ID {configurationId} is null.");
+            }
+            if (config.DestinationConnection == null)
+            {
+                throw new InvalidOperationException($"Destination connection for configuration ID {configurationId} is null.");
+            }
+
+            _logger.LogInformation("ExecuteDataTransferAsync: Resolving source connection string template for Config ID {ConfigId}. Template starts with: {CSStart}...", 
+                configurationId, config.SourceConnection.ConnectionString.Length > 20 ? config.SourceConnection.ConnectionString.Substring(0,20) : config.SourceConnection.ConnectionString);
+            string resolvedSourceConnectionString = await _connectionStringResolverService.ResolveConnectionStringAsync(config.SourceConnection.ConnectionString);
+            _logger.LogInformation("ExecuteDataTransferAsync: Source CS resolved for Config ID {ConfigId}. Resolved CS starts with: {CSStart}...", 
+                configurationId, resolvedSourceConnectionString.Length > 20 ? resolvedSourceConnectionString.Substring(0,20) : resolvedSourceConnectionString);
+
+            _logger.LogInformation("ExecuteDataTransferAsync: Resolving destination connection string template for Config ID {ConfigId}. Template starts with: {CSStart}...", 
+                configurationId, config.DestinationConnection.ConnectionString.Length > 20 ? config.DestinationConnection.ConnectionString.Substring(0,20) : config.DestinationConnection.ConnectionString);
+            string resolvedDestinationConnectionString = await _connectionStringResolverService.ResolveConnectionStringAsync(config.DestinationConnection.ConnectionString);
+            _logger.LogInformation("ExecuteDataTransferAsync: Destination CS resolved for Config ID {ConfigId}. Resolved CS starts with: {CSStart}...", 
+                configurationId, resolvedDestinationConnectionString.Length > 20 ? resolvedDestinationConnectionString.Substring(0,20) : resolvedDestinationConnectionString);
 
             // Create a new run record
             int runId;
@@ -1172,7 +1180,8 @@ namespace MCPServer.Core.Services.DataTransfer
             {
                 try
                 {
-                    await RunTransferAsync(connectionString, config, runId);
+                    // Pass resolved connection strings to RunTransferAsync
+                    await RunTransferAsync(connectionString, config, runId, resolvedSourceConnectionString, resolvedDestinationConnectionString);
                 }
                 catch (Exception ex)
                 {
@@ -1201,11 +1210,22 @@ namespace MCPServer.Core.Services.DataTransfer
             return runId;
         }
 
-        private async Task RunTransferAsync(string connectionString, DataTransferConfigurationDto config, int runId)
+        // Modified to accept resolved source and destination connection strings
+        private async Task RunTransferAsync(
+            string appDbConnectionString, // Connection string for the application's own database
+            DataTransferConfigurationDto config, 
+            int runId, 
+            string resolvedSourceDbConnectionString, 
+            string resolvedDestinationDbConnectionString)
         {
+            _logger.LogInformation("RunTransferAsync for Run ID {RunId}: Source CS (resolved) starts with: {SourceCSStart}..., Dest CS (resolved) starts with: {DestCSStart}...",
+                runId,
+                resolvedSourceDbConnectionString.Length > 20 ? resolvedSourceDbConnectionString.Substring(0,20) : resolvedSourceDbConnectionString,
+                resolvedDestinationDbConnectionString.Length > 20 ? resolvedDestinationDbConnectionString.Substring(0,20) : resolvedDestinationDbConnectionString);
+
             var transfer = new IncrementalDataTransfer(
-                config.SourceConnection.ConnectionString,
-                config.DestinationConnection.ConnectionString,
+                resolvedSourceDbConnectionString,     // Use resolved string
+                resolvedDestinationDbConnectionString, // Use resolved string
                 config.BatchSize,
                 config.ReportingFrequency,
                 _logger);
@@ -1224,7 +1244,7 @@ namespace MCPServer.Core.Services.DataTransfer
                 {
                     // Create a table metric record
                     int metricId;
-                    using (var connection = new SqlConnection(connectionString))
+                    using (var connection = new SqlConnection(appDbConnectionString)) // Use appDbConnectionString for metrics
                     {
                         await connection.OpenAsync();
 
@@ -1266,7 +1286,7 @@ namespace MCPServer.Core.Services.DataTransfer
                     totalRowsProcessed += summary.RowsProcessed;
 
                     // Update the metric record
-                    using (var connection = new SqlConnection(connectionString))
+                    using (var connection = new SqlConnection(appDbConnectionString)) // Use appDbConnectionString for metrics
                     {
                         await connection.OpenAsync();
 
@@ -1304,10 +1324,10 @@ namespace MCPServer.Core.Services.DataTransfer
                 catch (Exception ex)
                 {
                     failedTablesCount++;
-                    _logger.LogError(ex, $"Error processing table [{mapping.SchemaName}].[{mapping.TableName}]");
+                    _logger.LogError(ex, $"Error processing table [{mapping.SchemaName}].[{mapping.TableName}] for Run ID {runId}");
 
                     // Log the error
-                    using (var connection = new SqlConnection(connectionString))
+                    using (var connection = new SqlConnection(appDbConnectionString)) // Use appDbConnectionString for logs
                     {
                         await connection.OpenAsync();
 
@@ -1335,7 +1355,7 @@ namespace MCPServer.Core.Services.DataTransfer
             var avgRowsPerSecond = elapsedMs > 0 ? totalRowsProcessed / (elapsedMs / 1000.0) : 0;
 
             // Update the run record
-            using (var connection = new SqlConnection(connectionString))
+            using (var connection = new SqlConnection(appDbConnectionString)) // Use appDbConnectionString for run record
             {
                 await connection.OpenAsync();
 
@@ -1370,7 +1390,7 @@ namespace MCPServer.Core.Services.DataTransfer
             // Update the schedule's LastRunTime if this was scheduled
             if (config.Schedules != null && config.Schedules.Any(s => s.IsActive))
             {
-                using (var connection = new SqlConnection(connectionString))
+                using (var connection = new SqlConnection(appDbConnectionString)) // Use appDbConnectionString for schedule update
                 {
                     await connection.OpenAsync();
 
@@ -1569,6 +1589,8 @@ namespace MCPServer.Core.Services.DataTransfer
     {
         public int ConnectionId { get; set; }
         public string ConnectionName { get; set; } = string.Empty;
+        // This ConnectionString will hold the template (e.g., with {azurevault:...} placeholders) 
+        // or a direct connection string if not using Key Vault.
         public string ConnectionString { get; set; } = string.Empty;
         public string Description { get; set; } = string.Empty;
         public ConnectionAccessLevel ConnectionAccessLevel { get; set; } = ConnectionAccessLevel.ReadWrite;
@@ -1584,44 +1606,8 @@ namespace MCPServer.Core.Services.DataTransfer
         public bool Encrypt { get; set; } = true;
         public bool TrustServerCertificate { get; set; } = true;
 
-        // Properties for UI display
-        public string ConnectionStringForDisplay { get; set; } = string.Empty;
-        public Dictionary<string, string>? ConnectionDetails { get; set; }
-
-        // Property for actual use in SQL connections (when the original is hashed)
-        public string ConnectionStringForUse { get; set; } = string.Empty;
-
-        // Legacy properties - kept for backward compatibility during transition
-        // These will be removed after all code is updated to use ConnectionAccessLevel
-        [Obsolete("Use ConnectionAccessLevel instead")]
-        public bool IsSource
-        {
-            get => ConnectionAccessLevel == ConnectionAccessLevel.ReadOnly || ConnectionAccessLevel == ConnectionAccessLevel.ReadWrite;
-            set
-            {
-                if (value && !IsDestination)
-                    ConnectionAccessLevel = ConnectionAccessLevel.ReadOnly;
-                else if (value && IsDestination)
-                    ConnectionAccessLevel = ConnectionAccessLevel.ReadWrite;
-                else if (!value && IsDestination)
-                    ConnectionAccessLevel = ConnectionAccessLevel.WriteOnly;
-            }
-        }
-
-        [Obsolete("Use ConnectionAccessLevel instead")]
-        public bool IsDestination
-        {
-            get => ConnectionAccessLevel == ConnectionAccessLevel.WriteOnly || ConnectionAccessLevel == ConnectionAccessLevel.ReadWrite;
-            set
-            {
-                if (value && !IsSource)
-                    ConnectionAccessLevel = ConnectionAccessLevel.WriteOnly;
-                else if (value && IsSource)
-                    ConnectionAccessLevel = ConnectionAccessLevel.ReadWrite;
-                else if (!value && IsSource)
-                    ConnectionAccessLevel = ConnectionAccessLevel.ReadOnly;
-            }
-        }
+        // Removed ConnectionStringForDisplay, ConnectionDetails, ConnectionStringForUse
+        // Removed IsSource and IsDestination (fully replaced by ConnectionAccessLevel)
     }
 
     public class TableMappingDto

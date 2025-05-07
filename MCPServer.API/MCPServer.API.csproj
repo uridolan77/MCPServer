@@ -34,6 +34,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\MCPServer.Core\MCPServer.Core.csproj" />
+    <ProjectReference Include="..\MCPServer.DatabaseSchema\MCPServer.DatabaseSchema.csproj" />
   </ItemGroup>
 
 </Project>

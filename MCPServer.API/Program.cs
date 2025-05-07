@@ -295,6 +295,11 @@ builder.Services.AddScoped<MCPServer.Core.Services.DataTransfer.ConnectionString
 builder.Services.AddDataTransferServices(builder.Configuration);
 builder.Services.AddDataTransferApi();
 
+// Register the API-specific DataTransferService 
+builder.Services.AddSingleton<MCPServer.API.Features.DataTransfer.Services.DataTransferService>();
+builder.Services.AddSingleton<IAzureKeyVaultService, AzureKeyVaultService>();
+builder.Services.AddScoped<IConnectionStringResolverService, ConnectionStringResolverService>();
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.

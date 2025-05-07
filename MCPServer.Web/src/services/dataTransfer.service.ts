@@ -175,7 +175,9 @@ class DataTransferService {
   // Database schema operations
   static async getDatabaseSchema(connectionId: number) {
     try {
-      const response = await api.get(`/data-transfer/schema/${connectionId}`);
+      // const response = await api.get(`/data-transfer/schema/${connectionId}`);
+      // Updated to GET and new endpoint
+      const response = await api.get(`/data-transfer/Schema/databases?connectionId=${connectionId}`);
       return extractFromNestedValues(response.data);
     } catch (error) {
       console.error('Error in getDatabaseSchema:', error);
@@ -196,21 +198,60 @@ class DataTransferService {
   // Method to fetch database schema using connection data object
   static async fetchDatabaseSchema(connectionData: any) {
     try {
-      // Just log the connection data for debugging
-      console.log('Fetching database schema with data:', connectionData);
-
-      // If connectionId is provided, use getDatabaseSchema
-      if (connectionData.connectionId) {
-        return await this.getDatabaseSchema(connectionData.connectionId);
+      console.log('Fetching schema using connection data object');
+      
+      // Make sure connectionData has required properties
+      const payload = {
+        ...connectionData,
+        connectionName: connectionData.connectionName || 'Temporary Connection',
+        isActive: connectionData.isActive !== false, // default to true
+        maxPoolSize: connectionData.maxPoolSize || 100,
+        minPoolSize: connectionData.minPoolSize || 5,
+        timeout: connectionData.timeout || 30,
+        encrypt: connectionData.encrypt !== false, // default to true
+        trustServerCertificate: connectionData.trustServerCertificate !== false, // default to true
+      };
+      
+      // Process connection string if needed
+      if (payload.connectionString) {
+        // Convert Username= to User ID= if needed (SQL Server format)
+        if (payload.connectionString.includes('Username=') && !payload.connectionString.includes('User ID=')) {
+          payload.connectionString = payload.connectionString.replace(/Username=([^;]+)/g, "User ID=$1");
+        }
+        
+        // Convert Password= to pwd= if needed
+        if (payload.connectionString.includes('Password=') && !payload.connectionString.includes('pwd=')) {
+          payload.connectionString = payload.connectionString.replace(/Password=([^;]+)/g, "pwd=$1");
+        }
+        
+        // Set default connection timeout if none exists
+        if (!payload.connectionString.match(/Connect\s*Timeout=/i) && 
+            !payload.connectionString.match(/Connection\s*Timeout=/i)) {
+          payload.connectionString += ';Connection Timeout=30';
+        }
+        
+        console.log('Connection string prepared (first 30 chars):', 
+          payload.connectionString.substring(0, 30) + '...');
       }
-      // Otherwise use the connection string
-      else if (connectionData.connectionString) {
-        return await this.getDatabaseSchemaByConnectionString(connectionData.connectionString);
-      } else {
-        throw new Error('No connection ID or connection string provided');
-      }
+      
+      // Send the request to the API
+      const response = await api.post('/data-transfer/connections/schema', payload, {
+        timeout: 60000 // Increase timeout to 60 seconds for schema retrieval
+      });
+      
+      return extractFromNestedValues(response.data);
     } catch (error) {
       console.error('Error in fetchDatabaseSchema:', error);
+      // Enhance error handling
+      if (error.response && error.response.data) {
+        // Extract the error message from the response
+        const errorData = error.response.data;
+        if (typeof errorData === 'object') {
+          console.error('Server error details:', errorData);
+          // Throw with more detailed message if available
+          throw new Error(errorData.message || errorData.error || 'Failed to fetch database schema');
+        }
+      }
       throw error;
     }
   }
@@ -437,9 +478,16 @@ class DataTransferService {
     }
   }
 
-  static async getSchema(id: number) {
+  static async getSchema(id: number) { // This 'id' seems to be a configuration ID not a connection ID
     try {
-      const response = await api.get(`/data-transfer/schemas/${id}`);
+      // This likely refers to a saved configuration, not directly a database schema by connection ID.
+      // If it's meant to get schema for a connection ID, it should be getDatabaseSchema(id)
+      const response = await api.get(`/data-transfer/configurations/${id}`);
+      // Assuming the configuration might contain connection details to then fetch the schema,
+      // or this method is misnamed/misused in the original context.
+      // For now, keeping it as fetching configuration, as the path suggests.
+      // If it was intended to fetch schema by a direct ID that's not a connectionId,
+      // the backend doesn't seem to support that directly via an ID like '14' for a schema.
       return extractFromNestedValues(response.data);
     } catch (error) {
       console.error('Error in getSchema:', error);

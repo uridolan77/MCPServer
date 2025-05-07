@@ -8,6 +8,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MCPServer.API", "MCPServer.
 EndProject
 Project("{54A90642-561A-4BB1-A94E-469ADEE60C69}") = "MCPServer.Web", "MCPServer.Web\MCPServer.Web.esproj", "{2ACBDC70-263A-0B56-01C6-4939D2B5E81E}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MCPServer.DatabaseSchema", "MCPServer.DatabaseSchema\MCPServer.DatabaseSchema.csproj", "{4775008D-B110-891C-19D0-662DC0381A45}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -28,6 +30,10 @@ Global
 		{2ACBDC70-263A-0B56-01C6-4939D2B5E81E}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{2ACBDC70-263A-0B56-01C6-4939D2B5E81E}.Release|Any CPU.Build.0 = Release|Any CPU
 		{2ACBDC70-263A-0B56-01C6-4939D2B5E81E}.Release|Any CPU.Deploy.0 = Release|Any CPU
+		{4775008D-B110-891C-19D0-662DC0381A45}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4775008D-B110-891C-19D0-662DC0381A45}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4775008D-B110-891C-19D0-662DC0381A45}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4775008D-B110-891C-19D0-662DC0381A45}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

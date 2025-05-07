@@ -129,33 +129,112 @@ export const DatabaseSchemaSelector: React.FC<DatabaseSchemaSelectorProps> = ({
       let response;
       
       if (connectionId) {
+        console.log('Fetching schema using connectionId:', connectionId);
         // Use the connectionId to fetch schema
         response = await DataTransferService.getDatabaseSchema(connectionId);
       } else if (connectionString) {
-        // Use the connectionString to fetch schema
-        response = await DataTransferService.getDatabaseSchemaByConnectionString(connectionString);
+        console.log('Fetching schema using connectionString');
+        
+        // Check if the connection string needs SQL Server authentication placeholders resolved
+        let processedConnectionString = connectionString;
+        
+        if (processedConnectionString.includes("Username=") && !processedConnectionString.includes("User ID=")) {
+          processedConnectionString = processedConnectionString.replace(/Username=([^;]+)/g, "User ID=$1");
+        }
+        
+        if (processedConnectionString.includes("Password=") && processedConnectionString.includes("{{")) {
+          // Handle potential Key Vault references - use safe authentication
+          console.log("Connection string contains potential secure placeholders, using connection object");
+          response = await DataTransferService.fetchDatabaseSchema({
+            connectionString: processedConnectionString,
+            connectionName: databaseName || "TempConnection",
+            isActive: true
+          });
+        } else {
+          // Use the connectionString directly
+          response = await DataTransferService.getDatabaseSchemaByConnectionString(processedConnectionString);
+        }
       }
       
       if (!response) {
         throw new Error('No response from server');
       }
       
-      setSchema(response);
+      console.log('Schema response received:', response);
       
-      // Extract database name if available
-      if (response.databaseName) {
-        setDatabaseName(response.databaseName);
+      // Handle different response formats
+      if (response.schema) {
+        // New API format with schema property
+        setSchema(response.schema);
+      } else if (response.data && response.data.schema) {
+        // Nested schema in data property
+        setSchema(response.data.schema);
+      } else {
+        // Direct schema data or other format
+        setSchema(response);
+      }
+      
+      // Extract database name from response if available
+      let dbName = null;
+      const responseObj = typeof response === 'string' ? JSON.parse(response) : response;
+      
+      if (responseObj) {
+        if (responseObj.database) {
+          dbName = responseObj.database;
+        } else if (responseObj.databaseName) {
+          dbName = responseObj.databaseName;
+        } else if (responseObj.data && responseObj.data.database) {
+          dbName = responseObj.data.database;
+        } else if (Array.isArray(responseObj) && responseObj[0] && responseObj[0].databaseName) {
+          dbName = responseObj[0].databaseName;
+        } else {
+          // Try to extract from connection string
+          const dbNameMatch = connectionString?.match(/Initial Catalog=([^;]+)/i) || 
+                          connectionString?.match(/Database=([^;]+)/i);
+          if (dbNameMatch && dbNameMatch[1]) {
+            dbName = dbNameMatch[1];
+          }
+        }
+      }
+      
+      if (dbName) {
+        console.log('Database name detected:', dbName);
+        setDatabaseName(dbName);
+      } else {
+        console.log('No database name found in response, using default');
+        setDatabaseName('Database');
       }
       
       onSchemaLoaded?.(true);
     } catch (error: any) {
       console.error('Error fetching database schema:', error);
-      setError(error.message || 'Failed to load database schema');
+      let errorMessage = 'Failed to load database schema';
+      
+      // Extract detailed error from API response
+      if (error.response) {
+        const responseData = error.response.data;
+        if (typeof responseData === 'object') {
+          if (responseData.message) {
+            errorMessage = responseData.message;
+          } else if (responseData.error) {
+            errorMessage = responseData.error;
+          } else if (responseData.errorCode) {
+            errorMessage = `Error ${responseData.errorCode}: ${responseData.error || 'Database connection failed'}`;
+          }
+        } else if (typeof responseData === 'string') {
+          errorMessage = responseData;
+        }
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      console.log('Error message to display:', errorMessage);
+      setError(errorMessage);
       onSchemaLoaded?.(false);
     } finally {
       setIsLoading(false);
     }
-  }, [connectionId, connectionString, onSchemaLoaded]);
+  }, [connectionId, connectionString, databaseName, onSchemaLoaded]);
   
   // Process schema data when it changes
   useEffect(() => {
@@ -168,10 +247,31 @@ export const DatabaseSchemaSelector: React.FC<DatabaseSchemaSelectorProps> = ({
     try {
       let processedSchema: SchemaItem[] = [];
       
-      // Extract the tables array if available
-      const tablesArray = Array.isArray(schema) && schema.length > 1 && Array.isArray(schema[1]) 
-        ? schema[1] 
-        : Array.isArray(schema) ? schema : [];
+      // Check if schema is an array or an object with tables
+      let tablesArray: any[] = [];
+      
+      if (Array.isArray(schema)) {
+        // If it's a direct array, use it
+        tablesArray = schema;
+      } else if (schema.tables) {
+        // If it has a tables property, use that
+        // Check if tables has $values (API format) or is a direct array
+        tablesArray = schema.tables.$values || schema.tables;
+      } else if (schema[0] && schema[0].tables) {
+        // Some API responses nest tables under the first element
+        tablesArray = schema[0].tables.$values || schema[0].tables;
+      } else if (schema[1] && Array.isArray(schema[1])) {
+        // Handle specific format where second element is the tables array
+        tablesArray = schema[1];
+      }
+      
+      // Ensure tablesArray is an array
+      if (!Array.isArray(tablesArray)) {
+        console.warn('Could not locate tables array in schema data:', schema);
+        tablesArray = [];
+      }
+      
+      console.log('Processing tables array:', tablesArray);
       
       // Process each table in the array
       tablesArray.forEach((table) => {
@@ -189,31 +289,33 @@ export const DatabaseSchemaSelector: React.FC<DatabaseSchemaSelectorProps> = ({
           // Process columns - handle the nested structure with $values
           let tableColumns: Column[] = [];
           
-          // Check if columns exists and has a $values property
-          if (table.columns && table.columns.$values && Array.isArray(table.columns.$values)) {
-            tableColumns = table.columns.$values.map((col: any) => ({
-              name: col.name || '',
-              dataType: col.dataType || 'unknown',
-              isNullable: col.isNullable === true,
-              isIdentity: col.isIdentity === true,
-              isPrimaryKey: col.isPrimaryKey === true,
-              maxLength: col.maxLength,
-              defaultValue: col.defaultValue,
-              selected: isInitiallySelected // Default selected based on initial selection
-            }));
-          }
-          // Also try direct columns array if $values isn't present
-          else if (Array.isArray(table.columns)) {
-            tableColumns = table.columns.map((col: any) => ({
-              name: col.name || '',
-              dataType: col.dataType || 'unknown',
-              isNullable: col.isNullable === true,
-              isIdentity: col.isIdentity === true,
-              isPrimaryKey: col.isPrimaryKey === true,
-              maxLength: col.maxLength,
-              defaultValue: col.defaultValue,
-              selected: isInitiallySelected // Default selected based on initial selection
-            }));
+          // Check different possible column formats
+          if (table.columns) {
+            if (table.columns.$values && Array.isArray(table.columns.$values)) {
+              // Handle $values format
+              tableColumns = table.columns.$values.map((col: any) => ({
+                name: col.name || '',
+                dataType: col.dataType || 'unknown',
+                isNullable: col.isNullable === true,
+                isIdentity: col.isIdentity === true,
+                isPrimaryKey: col.isPrimaryKey === true,
+                maxLength: col.maxLength,
+                defaultValue: col.defaultValue,
+                selected: isInitiallySelected
+              }));
+            } else if (Array.isArray(table.columns)) {
+              // Handle direct array format
+              tableColumns = table.columns.map((col: any) => ({
+                name: col.name || '',
+                dataType: col.dataType || 'unknown',
+                isNullable: col.isNullable === true,
+                isIdentity: col.isIdentity === true,
+                isPrimaryKey: col.isPrimaryKey === true,
+                maxLength: col.maxLength,
+                defaultValue: col.defaultValue,
+                selected: isInitiallySelected
+              }));
+            }
           }
           
           // Add table with its columns to the processed schema
@@ -223,11 +325,12 @@ export const DatabaseSchemaSelector: React.FC<DatabaseSchemaSelectorProps> = ({
             type: objectType,
             columnCount: tableColumns.length || columnCount,
             columns: tableColumns,
-            selected: isInitiallySelected // Default selected based on initial selection
+            selected: isInitiallySelected
           });
         }
       });
       
+      console.log('Processed schema:', processedSchema);
       setNormalizedSchema(processedSchema);
       
       // Update parent component with the processed schema

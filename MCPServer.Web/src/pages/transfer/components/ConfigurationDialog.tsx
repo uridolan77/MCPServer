@@ -25,11 +25,69 @@ import {
   Chip,
   Box,
   Tabs,
-  Tab
+  Tab,
+  SelectChangeEvent
 } from '@mui/material';
 import { Add as AddIcon, Delete as DeleteIcon } from '@mui/icons-material';
 
-function TabPanel(props) {
+// Define TypeScript interfaces for our data structures
+interface Connection {
+  connectionId: string;
+  connectionName: string;
+  isSource: boolean;
+  isDestination: boolean;
+}
+
+interface TableMapping {
+  mappingId: number;
+  schemaName: string;
+  tableName: string;
+  timestampColumnName: string;
+  orderByColumn: string;
+  customWhereClause: string;
+  isActive: boolean;
+  priority: number;
+}
+
+interface Schedule {
+  scheduleId: number;
+  scheduleType: string;
+  startTime: string;
+  frequency: number;
+  frequencyUnit: string;
+  weekDays: string;
+  monthDays: string;
+  isActive: boolean;
+}
+
+interface ConfigurationData {
+  configurationId: number;
+  configurationName: string;
+  description: string;
+  sourceConnection: { connectionId: string };
+  destinationConnection: { connectionId: string };
+  batchSize: number;
+  reportingFrequency: number;
+  isActive: boolean;
+  tableMappings: TableMapping[];
+  schedules: Schedule[];
+}
+
+interface ConfigurationDialogProps {
+  open: boolean;
+  configuration: ConfigurationData | null;
+  connections: Connection[];
+  onClose: () => void;
+  onSave: (configuration: ConfigurationData) => void;
+}
+
+interface TabPanelProps {
+  children?: React.ReactNode;
+  value: number;
+  index: number;
+}
+
+function TabPanel(props: TabPanelProps) {
   const { children, value, index, ...other } = props;
 
   return (
@@ -49,9 +107,9 @@ function TabPanel(props) {
   );
 }
 
-export default function ConfigurationDialog({ open, configuration, connections, onClose, onSave }) {
-  const [tabValue, setTabValue] = useState(0);
-  const [formData, setFormData] = useState({
+export default function ConfigurationDialog({ open, configuration, connections, onClose, onSave }: ConfigurationDialogProps) {
+  const [tabValue, setTabValue] = useState<number>(0);
+  const [formData, setFormData] = useState<ConfigurationData>({
     configurationId: 0,
     configurationName: '',
     description: '',
@@ -64,7 +122,8 @@ export default function ConfigurationDialog({ open, configuration, connections, 
     schedules: []
   });
 
-  const [newTableMapping, setNewTableMapping] = useState({
+  const [newTableMapping, setNewTableMapping] = useState<TableMapping>({
+    mappingId: 0,
     schemaName: '',
     tableName: '',
     timestampColumnName: '',
@@ -74,7 +133,8 @@ export default function ConfigurationDialog({ open, configuration, connections, 
     priority: 100,
   });
 
-  const [newSchedule, setNewSchedule] = useState({
+  const [newSchedule, setNewSchedule] = useState<Schedule>({
+    scheduleId: 0,
     scheduleType: 'Daily',
     startTime: '00:00',
     frequency: 1,
@@ -114,40 +174,40 @@ export default function ConfigurationDialog({ open, configuration, connections, 
     }
   }, [configuration, open]);
 
-  const handleChange = (e) => {
-    const { name, value, checked } = e.target;
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | { name?: string; value: unknown; checked?: boolean }> | SelectChangeEvent<string>) => {
+    const target = e.target as { name: string; value: unknown; checked?: boolean; type?: string };
 
     // Handle nested properties
-    if (name.includes('.')) {
-      const [parent, child] = name.split('.');
+    if (target.name.includes('.')) {
+      const [parent, child] = target.name.split('.');
       setFormData(prev => ({
         ...prev,
         [parent]: {
-          ...prev[parent],
-          [child]: value
+          ...(prev[parent as keyof ConfigurationData] as object),
+          [child]: target.value
         }
       }));
     } else {
       setFormData(prev => ({
         ...prev,
-        [name]: e.target.type === 'checkbox' ? checked : value
+        [target.name]: target.type === 'checkbox' ? target.checked : target.value
       }));
     }
   };
 
-  const handleTableMappingChange = (e) => {
-    const { name, value, checked } = e.target;
+  const handleTableMappingChange = (e: React.ChangeEvent<HTMLInputElement | { name?: string; value: unknown; checked?: boolean }> | SelectChangeEvent<string>) => {
+    const target = e.target as { name: string; value: unknown; checked?: boolean; type?: string };
     setNewTableMapping(prev => ({
       ...prev,
-      [name]: e.target.type === 'checkbox' ? checked : value
+      [target.name]: target.type === 'checkbox' ? target.checked : target.value
     }));
   };
 
-  const handleScheduleChange = (e) => {
-    const { name, value, checked } = e.target;
+  const handleScheduleChange = (e: React.ChangeEvent<HTMLInputElement | { name?: string; value: unknown; checked?: boolean }> | SelectChangeEvent<string>) => {
+    const target = e.target as { name: string; value: unknown; checked?: boolean; type?: string };
     setNewSchedule(prev => ({
       ...prev,
-      [name]: e.target.type === 'checkbox' ? checked : value
+      [target.name]: target.type === 'checkbox' ? target.checked : target.value
     }));
   };
 
@@ -166,6 +226,7 @@ export default function ConfigurationDialog({ open, configuration, connections, 
 
     // Reset form
     setNewTableMapping({
+      mappingId: 0,
       schemaName: '',
       tableName: '',
       timestampColumnName: '',
@@ -176,7 +237,7 @@ export default function ConfigurationDialog({ open, configuration, connections, 
     });
   };
 
-  const handleRemoveTableMapping = (index) => {
+  const handleRemoveTableMapping = (index: number) => {
     setFormData(prev => ({
       ...prev,
       tableMappings: prev.tableMappings.filter((_, i) => i !== index)
@@ -194,6 +255,7 @@ export default function ConfigurationDialog({ open, configuration, connections, 
 
     // Reset form
     setNewSchedule({
+      scheduleId: 0,
       scheduleType: 'Daily',
       startTime: '00:00',
       frequency: 1,
@@ -204,14 +266,14 @@ export default function ConfigurationDialog({ open, configuration, connections, 
     });
   };
 
-  const handleRemoveSchedule = (index) => {
+  const handleRemoveSchedule = (index: number) => {
     setFormData(prev => ({
       ...prev,
       schedules: prev.schedules.filter((_, i) => i !== index)
     }));
   };
 
-  const handleTabChange = (event, newValue) => {
+  const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue);
   };
 
@@ -232,7 +294,7 @@ export default function ConfigurationDialog({ open, configuration, connections, 
       destinationConnection: destinationConnection
     };
 
-    onSave(configToSave);
+    onSave(configToSave as ConfigurationData);
   };
 
   return (
@@ -278,7 +340,7 @@ export default function ConfigurationDialog({ open, configuration, connections, 
                 <InputLabel>Source Connection</InputLabel>
                 <Select
                   value={formData.sourceConnection.connectionId}
-                  onChange={(e) => {
+                  onChange={(e: SelectChangeEvent) => {
                     setFormData(prev => ({
                       ...prev,
                       sourceConnection: { connectionId: e.target.value }
@@ -306,7 +368,7 @@ export default function ConfigurationDialog({ open, configuration, connections, 
                 <InputLabel>Destination Connection</InputLabel>
                 <Select
                   value={formData.destinationConnection.connectionId}
-                  onChange={(e) => {
+                  onChange={(e: SelectChangeEvent) => {
                     setFormData(prev => ({
                       ...prev,
                       destinationConnection: { connectionId: e.target.value }

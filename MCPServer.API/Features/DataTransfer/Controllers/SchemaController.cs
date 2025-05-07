@@ -29,22 +29,29 @@ namespace MCPServer.API.Features.DataTransfer.Controllers
         }
 
         [HttpGet("databases")]
-        public async Task<ActionResult<IEnumerable<string>>> GetDatabases([FromQuery] string connectionId)
+        public async Task<ActionResult<IEnumerable<string>>> GetDatabases([FromQuery] string? connectionId, [FromQuery] string? connectionString)
         {
             try
             {
-                // In a production environment, you would look up the connection string from a database
-                // For now, we'll use the configured connection strings
-                string connectionString = GetConnectionString(connectionId);
-                
-                if (string.IsNullOrEmpty(connectionString))
+                string? effectiveConnectionString = null;
+
+                if (!string.IsNullOrEmpty(connectionString))
                 {
-                    return BadRequest("Invalid connection ID or missing connection string");
+                    effectiveConnectionString = connectionString;
+                }
+                else if (!string.IsNullOrEmpty(connectionId))
+                {
+                    effectiveConnectionString = GetConnectionString(connectionId);
+                }
+                
+                if (string.IsNullOrEmpty(effectiveConnectionString))
+                {
+                    return BadRequest("Connection ID or Connection String is required and must be valid.");
                 }
 
                 var databases = new List<string>();
                 
-                using (var connection = new SqlConnection(connectionString))
+                using (var connection = new SqlConnection(effectiveConnectionString))
                 {
                     await connection.OpenAsync();
                     
@@ -295,7 +302,7 @@ namespace MCPServer.API.Features.DataTransfer.Controllers
             [FromQuery] string sourceDatabase,
             [FromQuery] string targetDatabase,
             [FromQuery] string sourceTable,
-            [FromQuery] string targetTable = null,
+            [FromQuery] string? targetTable = null, // Made targetTable nullable
             [FromQuery] string sourceSchema = "dbo",
             [FromQuery] string targetSchema = "dbo")
         {
@@ -353,21 +360,21 @@ namespace MCPServer.API.Features.DataTransfer.Controllers
                 
                 // Find potential timestamp column for incremental loading
                 var dateColumns = sourceColumns.FindAll(c => 
-                    c.DataType.Contains("date") || 
-                    c.DataType.Contains("time"));
+                    c.DataType?.Contains("date") == true || 
+                    c.DataType?.Contains("time") == true);
                 
                 if (dateColumns.Count > 0)
                 {
                     // Prefer columns named LastModified, UpdatedAt, etc.
                     var updateColumn = dateColumns.Find(c => 
-                        c.Name.Contains("Last") || 
-                        c.Name.Contains("Update") || 
-                        c.Name.Contains("Modified"));
+                        c.Name?.Contains("Last") == true || 
+                        c.Name?.Contains("Update") == true || 
+                        c.Name?.Contains("Modified") == true);
                     
                     if (updateColumn != null)
                     {
                         mapping.IncrementalType = "DateTime";
-                        mapping.IncrementalColumn = updateColumn.Name;
+                        mapping.IncrementalColumn = updateColumn.Name!;
                         mapping.IncrementalCompareOperator = ">";
                         mapping.IncrementalStartValue = DateTime.Now.AddMonths(-1).ToString("yyyy-MM-dd HH:mm:ss");
                     }
@@ -379,10 +386,10 @@ namespace MCPServer.API.Features.DataTransfer.Controllers
                     var identityColumn = sourceColumns.Find(c => c.IsIdentity || c.IsPrimaryKey);
                     
                     if (identityColumn != null && 
-                        (identityColumn.DataType.Contains("int") || identityColumn.DataType.Contains("bigint")))
+                        (identityColumn.DataType?.Contains("int") == true || identityColumn.DataType?.Contains("bigint") == true))
                     {
                         mapping.IncrementalType = identityColumn.DataType.Contains("bigint") ? "BigInt" : "Int";
-                        mapping.IncrementalColumn = identityColumn.Name;
+                        mapping.IncrementalColumn = identityColumn.Name!;
                         mapping.IncrementalCompareOperator = ">";
                         mapping.IncrementalStartValue = 0;
                     }
@@ -399,9 +406,9 @@ namespace MCPServer.API.Features.DataTransfer.Controllers
                     {
                         mapping.ColumnMappings.Add(new ColumnMapping
                         {
-                            SourceColumn = sourceCol.Name,
-                            TargetColumn = targetCol.Name,
-                            DataType = targetCol.DataType,
+                            SourceColumn = sourceCol.Name!,
+                            TargetColumn = targetCol.Name!,
+                            DataType = targetCol.DataType!,
                             AllowNull = targetCol.IsNullable
                         });
                     }
@@ -425,7 +432,7 @@ namespace MCPServer.API.Features.DataTransfer.Controllers
             }
         }
 
-        private string GetConnectionString(string connectionId)
+        private string? GetConnectionString(string connectionId)
         {
             // In a production environment, you would get this from a database
             // For now, we'll use hardcoded values based on ConnectionStrings section in config
@@ -433,7 +440,8 @@ namespace MCPServer.API.Features.DataTransfer.Controllers
             {
                 "source" => _configuration.GetConnectionString("DataTransfer:Source"),
                 "target" => _configuration.GetConnectionString("DataTransfer:Target"),
-                _ => null
+                // Attempt to parse as int for future DB lookup, for now, it won't resolve numeric IDs here
+                _ => int.TryParse(connectionId, out _) ? null : _configuration.GetConnectionString(connectionId) 
             };
         }
         
@@ -506,6 +514,7 @@ namespace MCPServer.API.Features.DataTransfer.Controllers
         
         private string FormatFullDataType(ColumnInfo column)
         {
+            if (column.DataType == null) return string.Empty;
             switch (column.DataType.ToLowerInvariant())
             {
                 case "char":
@@ -527,17 +536,17 @@ namespace MCPServer.API.Features.DataTransfer.Controllers
 
         public class TableInfo
         {
-            public string Name { get; set; }
-            public string Type { get; set; }
+            public string? Name { get; set; } // Made Name nullable
+            public string? Type { get; set; } // Made Type nullable
             public int ColumnCount { get; set; }
             public bool HasPrimaryKey { get; set; }
         }
 
         public class ColumnInfo
         {
-            public string Name { get; set; }
-            public string DataType { get; set; }
-            public string FullDataType { get; set; }
+            public string? Name { get; set; } // Made Name nullable
+            public string? DataType { get; set; } // Made DataType nullable
+            public string? FullDataType { get; set; } // Made FullDataType nullable
             public int? MaxLength { get; set; }
             public int? Precision { get; set; }
             public int? Scale { get; set; }
