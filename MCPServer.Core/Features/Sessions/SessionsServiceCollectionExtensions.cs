@@ -1,6 +1,4 @@
 using System;
-using MCPServer.Core.Services;
-using MCPServer.Core.Services.Interfaces;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace MCPServer.Core.Features.Sessions
@@ -22,9 +20,9 @@ namespace MCPServer.Core.Features.Sessions
                 throw new ArgumentNullException(nameof(services));
             }
 
-            // Register session services
-            services.AddScoped<ISessionService, MCPServer.Core.Services.SessionService>();
-            services.AddScoped<IContextService, MCPServer.Core.Services.MySqlContextService>();
+            // Note: The following services were removed in the cleanup:
+            // - SessionService
+            // - MySqlContextService
 
             return services;
         }

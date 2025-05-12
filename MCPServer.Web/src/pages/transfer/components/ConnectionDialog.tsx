@@ -10,7 +10,8 @@ import {
   Tabs,
   Tab
 } from '@mui/material';
-import DataTransferService from '@/services/dataTransfer.service';
+import ConnectionService from '@/services/connection.service';
+import SchemaService from '@/services/schema.service';
 
 // Import the new component modules
 import ConnectionBasicInfo from './ConnectionBasicInfo';
@@ -20,51 +21,39 @@ import TestConnectionSection from './TestConnectionSection';
 import ConnectionSettings from './ConnectionSettings';
 import DatabaseSchemaDialog from './DatabaseSchemaDialog';
 
-interface ConnectionDialogProps {
-  open: boolean;
-  connection: any;
-  onClose: () => void;
-  onSave: (connection: any) => void;
-}
-
-interface ConnectionDetails {
-  server: string;
-  database: string;
-  username: string;
-  password: string;
-  port?: string;
-  additionalParams?: string;
-}
+// Import the shared Connection interface
+import { Connection } from '../types/Connection';
 
 export default function ConnectionDialog({ open, connection, onClose, onSave }: ConnectionDialogProps) {
-  const [formData, setFormData] = useState({
+  const [connectionDetails, setConnectionDetails] = useState<Connection>({
     connectionId: 0,
     connectionName: '',
     connectionString: '',
-    description: '',
-    isSource: true,
-    isDestination: false,
-    isActive: false,
     connectionAccessLevel: 'ReadOnly',
-    lastTestedOn: null as Date | null,
-    connectionType: 'sqlServer',
-    timeout: 30,
-    maxPoolSize: 100,
-    minPoolSize: 5,
-    encrypt: true,
-    trustServerCertificate: true,
-  });
-
-  const [connectionMode, setConnectionMode] = useState<'string' | 'details'>('string');
-  const [connectionDetails, setConnectionDetails] = useState<ConnectionDetails>({
+    description: '',
     server: '',
+    port: null,
     database: '',
     username: '',
     password: '',
-    port: '',
-    additionalParams: '',
+    additionalParameters: '',
+    isActive: true,
+    isConnectionValid: null,
+    minPoolSize: 5,
+    maxPoolSize: 100,
+    timeout: 30,
+    trustServerCertificate: true,
+    encrypt: true,
+    createdBy: "System",
+    createdOn: new Date().toISOString(),
+    lastModifiedBy: "System",
+    lastModifiedOn: new Date().toISOString(),
+    lastTestedOn: null,
+    isSource: true,
+    isDestination: false
   });
 
+  const [connectionMode, setConnectionMode] = useState<'string' | 'details'>('string');
   const [isTesting, setIsTesting] = useState(false);
   const [testResult, setTestResult] = useState<null | {
     success: boolean;
@@ -83,6 +72,8 @@ export default function ConnectionDialog({ open, connection, onClose, onSave }: 
 
   useEffect(() => {
     if (connection) {
+      console.log('Loading connection for edit:', connection);
+      
       let accessLevel = connection.connectionAccessLevel || 'ReadOnly';
       if (!connection.connectionAccessLevel) {
         if (connection.isSource && connection.isDestination) {
@@ -94,41 +85,44 @@ export default function ConnectionDialog({ open, connection, onClose, onSave }: 
         }
       }
 
-      const displayConnectionString = connection.connectionStringForDisplay || connection.connectionString || '';
-
-      setFormData({
+      // Set connection details using the flattened model
+      setConnectionDetails({
         connectionId: connection.connectionId || 0,
         connectionName: connection.connectionName || '',
-        connectionString: displayConnectionString,
-        description: connection.description || '',
-        isSource: connection.isSource !== undefined ? connection.isSource : true,
-        isDestination: connection.isDestination !== undefined ? connection.isDestination : false,
-        isActive: connection.isActive !== undefined ? connection.isActive : true,
+        connectionString: connection.connectionString || '',
         connectionAccessLevel: accessLevel,
-        lastTestedOn: connection.lastTestedOn ? new Date(connection.lastTestedOn) : null,
-        connectionType: connection.connectionType || 'sqlServer',
-        timeout: connection.timeout || 30,
-        maxPoolSize: connection.maxPoolSize || 100,
+        description: connection.description || '',
+        server: connection.server || '',
+        database: connection.database || '',
+        username: connection.username || '',
+        password: connection.password || '',
+        port: connection.port !== undefined ? connection.port : null,
+        additionalParameters: connection.additionalParameters || '',
+        isActive: connection.isActive !== undefined ? connection.isActive : true,
+        isConnectionValid: connection.isConnectionValid || null,
         minPoolSize: connection.minPoolSize || 5,
-        encrypt: connection.encrypt !== undefined ? connection.encrypt : true,
+        maxPoolSize: connection.maxPoolSize || 100,
+        timeout: connection.timeout || 30,
         trustServerCertificate: connection.trustServerCertificate !== undefined ? connection.trustServerCertificate : true,
+        encrypt: connection.encrypt !== undefined ? connection.encrypt : true,
+        createdBy: connection.createdBy || "System",
+        createdOn: connection.createdOn || new Date().toISOString(),
+        lastModifiedBy: connection.lastModifiedBy || "System",
+        lastModifiedOn: connection.lastModifiedOn || new Date().toISOString(),
+        lastTestedOn: connection.lastTestedOn ? new Date(connection.lastTestedOn).toISOString() : null,
+        // Computed properties based on connectionAccessLevel
+        isSource: accessLevel === 'ReadOnly' || accessLevel === 'ReadWrite',
+        isDestination: accessLevel === 'WriteOnly' || accessLevel === 'ReadWrite'
       });
 
-      if (connection.connectionDetails) {
-        setConnectionDetails({
-          server: connection.connectionDetails.server || '',
-          database: connection.connectionDetails.database || '',
-          username: connection.connectionDetails.username || '',
-          password: connection.connectionDetails.password || '',
-          port: connection.connectionDetails.port || '',
-          additionalParams: '',
-        });
-
+      // Determine connection mode based on available information
+      if (connection.server) {
         setConnectionMode('details');
-      } else if (displayConnectionString) {
-        parseConnectionString(displayConnectionString);
+      } else if (connection.connectionString) {
+        parseConnectionString(connection.connectionString);
       }
 
+      // Set connection test status
       if (connection.lastTestedOn && connection.isActive) {
         setConnectionTested(true);
       } else {
@@ -136,32 +130,33 @@ export default function ConnectionDialog({ open, connection, onClose, onSave }: 
         setConnectionTested(false);
       }
     } else {
-      // Reset form for new connections
-      setFormData({
+      // Reset connection details for new connections
+      setConnectionDetails({
         connectionId: 0,
         connectionName: '',
         connectionString: '',
-        description: '',
-        isSource: true,
-        isDestination: false,
-        isActive: false,
         connectionAccessLevel: 'ReadOnly',
-        lastTestedOn: null,
-        connectionType: 'sqlServer',
-        timeout: 30,
-        maxPoolSize: 100,
-        minPoolSize: 5,
-        encrypt: true,
-        trustServerCertificate: true,
-      });
-
-      setConnectionDetails({
+        description: '',
         server: '',
+        port: null,
         database: '',
         username: '',
         password: '',
-        port: '',
-        additionalParams: '',
+        additionalParameters: '',
+        isActive: true,
+        isConnectionValid: null,
+        minPoolSize: 5,
+        maxPoolSize: 100,
+        timeout: 30,
+        trustServerCertificate: true,
+        encrypt: true,
+        createdBy: "System",
+        createdOn: new Date().toISOString(),
+        lastModifiedBy: "System",
+        lastModifiedOn: new Date().toISOString(),
+        lastTestedOn: null,
+        isSource: true,
+        isDestination: false
       });
 
       setTestResult(null);
@@ -172,14 +167,7 @@ export default function ConnectionDialog({ open, connection, onClose, onSave }: 
   // Helper functions
   const parseConnectionString = (connectionString: string) => {
     try {
-      const details: ConnectionDetails = {
-        server: '',
-        database: '',
-        username: '',
-        password: '',
-        port: '',
-        additionalParams: '',
-      };
+      const details = { ...connectionDetails };
 
       const params = connectionString.split(';');
       params.forEach(param => {
@@ -198,7 +186,7 @@ export default function ConnectionDialog({ open, connection, onClose, onSave }: 
         } else if (keyLower === 'password' || keyLower === 'pwd') {
           details.password = valueClean;
         } else if (keyLower === 'port') {
-          details.port = valueClean;
+          details.port = Number(valueClean);
         }
       });
 
@@ -213,31 +201,33 @@ export default function ConnectionDialog({ open, connection, onClose, onSave }: 
   const buildConnectionString = () => {
     if (connectionMode === 'string') {
       // Just return the connection string as is
-      return formData.connectionString;
+      return connectionDetails.connectionString;
     }
 
     // For details mode, build the connection string with all parameters
-    const { server, database, username, password, port, additionalParams } = connectionDetails;
+    const { server, database, username, password, port, additionalParameters } = connectionDetails;
     let connectionString = '';
 
-    if (formData.connectionType === 'sqlServer') {
+    const connectionType = 'sqlServer'; // Default to SQL Server for now
+
+    if (connectionType === 'sqlServer') {
       // Always include username and password
       connectionString = `Server=${server}${port ? ',' + port : ''};Database=${database};User ID=${username};Password=${password};`;
 
-      if (formData.encrypt) {
+      if (connectionDetails.encrypt) {
         connectionString += 'Encrypt=True;';
       }
 
-      if (formData.trustServerCertificate) {
+      if (connectionDetails.trustServerCertificate) {
         connectionString += 'TrustServerCertificate=True;';
       }
 
-      connectionString += `Connection Timeout=${formData.timeout};`;
+      connectionString += `Connection Timeout=${connectionDetails.timeout};`;
 
-      if (additionalParams) {
-        connectionString += additionalParams;
+      if (additionalParameters) {
+        connectionString += additionalParameters;
       }
-    } else if (formData.connectionType === 'mysql') {
+    } else if (connectionType === 'mysql') {
       // Always include username and password
       connectionString = `Server=${server};Database=${database};User ID=${username};Password=${password};`;
 
@@ -245,10 +235,10 @@ export default function ConnectionDialog({ open, connection, onClose, onSave }: 
         connectionString += `Port=${port};`;
       }
 
-      connectionString += `Connection Timeout=${formData.timeout};`;
+      connectionString += `Connection Timeout=${connectionDetails.timeout};`;
 
-      if (additionalParams) {
-        connectionString += additionalParams;
+      if (additionalParameters) {
+        connectionString += additionalParameters;
       }
     }
 
@@ -257,14 +247,14 @@ export default function ConnectionDialog({ open, connection, onClose, onSave }: 
   };
 
   // Event handlers
-  const handleChangeFixed = (e: React.ChangeEvent<HTMLInputElement | { name?: string; value: unknown }>) => {
-    const { name, value, checked } = e.target as any;
+  const handleConnectionDetailsChange = (e: React.ChangeEvent<HTMLInputElement | { name?: string; value: unknown }>) => {
+    const { name, value, checked, type } = e.target as any;
 
     if (!name) return;
 
-    setFormData(prev => ({
+    setConnectionDetails(prev => ({
       ...prev,
-      [name]: (e.target as any).type === 'checkbox' ? checked : value
+      [name]: type === 'checkbox' ? checked : value
     }));
 
     if (name === 'connectionString') {
@@ -273,42 +263,14 @@ export default function ConnectionDialog({ open, connection, onClose, onSave }: 
     }
   };
 
-  const handleConnectionDetailsChange = (e: React.ChangeEvent<HTMLInputElement | { name?: string; value: unknown }>) => {
-    const { name, value } = e.target as any;
-
-    if (!name) return;
-
-    setConnectionDetails(prev => ({
-      ...prev,
-      [name]: value
-    }));
-
-    setTestResult(null);
-    setConnectionTested(false);
-  };
-
-  const handleSelectChange = (e: any) => {
-    const { name, value } = e.target;
-
-    if (!name) return;
-
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
-
-    setTestResult(null);
-    setConnectionTested(false);
-  };
-
   const handleConnectionModeChange = (_event: React.SyntheticEvent, newValue: 'string' | 'details') => {
     setConnectionMode(newValue);
 
-    if (newValue === 'details' && formData.connectionString) {
-      parseConnectionString(formData.connectionString);
+    if (newValue === 'details' && connectionDetails.connectionString) {
+      parseConnectionString(connectionDetails.connectionString);
     } else if (newValue === 'string' && connectionDetails.server) {
       const connectionString = buildConnectionString();
-      setFormData(prev => ({
+      setConnectionDetails(prev => ({
         ...prev,
         connectionString
       }));
@@ -322,21 +284,21 @@ export default function ConnectionDialog({ open, connection, onClose, onSave }: 
     const value = e.target.value;
 
     if (value === 'source') {
-      setFormData(prev => ({
+      setConnectionDetails(prev => ({
         ...prev,
         isSource: true,
         isDestination: false,
         connectionAccessLevel: 'ReadOnly'
       }));
     } else if (value === 'destination') {
-      setFormData(prev => ({
+      setConnectionDetails(prev => ({
         ...prev,
         isSource: false,
         isDestination: true,
         connectionAccessLevel: 'WriteOnly'
       }));
     } else if (value === 'both') {
-      setFormData(prev => ({
+      setConnectionDetails(prev => ({
         ...prev,
         isSource: true,
         isDestination: true,
@@ -350,7 +312,7 @@ export default function ConnectionDialog({ open, connection, onClose, onSave }: 
 
     if (connectionMode === 'string') {
       // For connection string mode, ensure username and password are included
-      connectionString = formData.connectionString;
+      connectionString = connectionDetails.connectionString;
 
       // Make sure username and password are in the connection string
       if (connectionDetails.username && connectionDetails.password) {
@@ -386,25 +348,18 @@ export default function ConnectionDialog({ open, connection, onClose, onSave }: 
     try {
       let connectionAccessLevelValue: number;
 
-      if (formData.connectionAccessLevel) {
-        switch (formData.connectionAccessLevel) {
-          case 'ReadOnly':
-            connectionAccessLevelValue = 0;
-            break;
-          case 'WriteOnly':
-            connectionAccessLevelValue = 1;
-            break;
-          case 'ReadWrite':
-            connectionAccessLevelValue = 2;
-            break;
-          default:
-            connectionAccessLevelValue = 0;
-        }
-      } else {
-        connectionAccessLevelValue =
-          (formData.isSource && formData.isDestination) ? 2 :
-          formData.isSource ? 0 :
-          formData.isDestination ? 1 : 0;
+      switch (connectionDetails.connectionAccessLevel) {
+        case 'ReadOnly':
+          connectionAccessLevelValue = 0;
+          break;
+        case 'WriteOnly':
+          connectionAccessLevelValue = 1;
+          break;
+        case 'ReadWrite':
+          connectionAccessLevelValue = 2;
+          break;
+        default:
+          connectionAccessLevelValue = 0;
       }
 
       // Log the username and password for debugging
@@ -413,27 +368,27 @@ export default function ConnectionDialog({ open, connection, onClose, onSave }: 
       console.log('Testing connection string:', connectionString);
 
       const connectionData = {
-        connectionId: formData.connectionId,
-        connectionName: formData.connectionName,
+        connectionId: connectionDetails.connectionId,
+        connectionName: connectionDetails.connectionName,
         connectionString: connectionString,
-        description: formData.description,
+        description: connectionDetails.description,
         connectionAccessLevel: connectionAccessLevelValue,
-        isActive: formData.isActive,
-        maxPoolSize: formData.maxPoolSize,
-        minPoolSize: formData.minPoolSize,
-        timeout: formData.timeout,
-        encrypt: formData.encrypt,
-        trustServerCertificate: formData.trustServerCertificate,
+        isActive: connectionDetails.isActive,
+        maxPoolSize: connectionDetails.maxPoolSize,
+        minPoolSize: connectionDetails.minPoolSize,
+        timeout: connectionDetails.timeout,
+        encrypt: connectionDetails.encrypt,
+        trustServerCertificate: connectionDetails.trustServerCertificate,
         // Include username and password directly
         username: connectionDetails.username,
         password: connectionDetails.password,
-        createdBy: "System",
-        lastModifiedBy: "System",
-        createdOn: new Date().toISOString(),
-        lastModifiedOn: new Date().toISOString()
+        createdBy: connectionDetails.createdBy,
+        lastModifiedBy: connectionDetails.lastModifiedBy,
+        createdOn: connectionDetails.createdOn,
+        lastModifiedOn: connectionDetails.lastModifiedOn
       };
 
-      const response = await DataTransferService.testConnection(connectionData);
+      const response = await ConnectionService.testConnection(connectionData);
 
       if (response && response.success) {
         setTestResult({
@@ -444,16 +399,16 @@ export default function ConnectionDialog({ open, connection, onClose, onSave }: 
         });
 
         if (connectionMode === 'details') {
-          setFormData(prev => ({
+          setConnectionDetails(prev => ({
             ...prev,
             connectionString
           }));
         }
 
         const now = new Date();
-        setFormData(prev => ({
+        setConnectionDetails(prev => ({
           ...prev,
-          lastTestedOn: now,
+          lastTestedOn: now.toISOString(),
           isActive: true
         }));
 
@@ -519,7 +474,7 @@ export default function ConnectionDialog({ open, connection, onClose, onSave }: 
       // Use the same connection string that was used for the successful test
       let connectionStr = '';
       if (connectionMode === 'string') {
-        connectionStr = formData.connectionString;
+        connectionStr = connectionDetails.connectionString;
       } else {
         connectionStr = buildConnectionString();
       }
@@ -530,23 +485,23 @@ export default function ConnectionDialog({ open, connection, onClose, onSave }: 
       console.log('Fetching schema with connection string:', connectionStr);
 
       const connectionData = {
-        connectionId: formData.connectionId,
-        connectionName: formData.connectionName,
+        connectionId: connectionDetails.connectionId,
+        connectionName: connectionDetails.connectionName,
         connectionString: connectionStr,
-        connectionAccessLevel: formData.connectionAccessLevel,
+        connectionAccessLevel: connectionDetails.connectionAccessLevel,
         // Include username and password directly
         username: connectionDetails.username,
         password: connectionDetails.password,
         // Include these additional parameters that are used during successful test connection
-        encrypt: formData.encrypt,
-        trustServerCertificate: formData.trustServerCertificate,
-        timeout: formData.timeout,
-        maxPoolSize: formData.maxPoolSize,
-        minPoolSize: formData.minPoolSize
+        encrypt: connectionDetails.encrypt,
+        trustServerCertificate: connectionDetails.trustServerCertificate,
+        timeout: connectionDetails.timeout,
+        maxPoolSize: connectionDetails.maxPoolSize,
+        minPoolSize: connectionDetails.minPoolSize
       };
 
       console.log('Sending schema request for database:', connectionDetails.database || 'Unknown');
-      const response = await DataTransferService.fetchDatabaseSchema(connectionData);
+      const response = await SchemaService.fetchDatabaseSchema(connectionData);
       console.log('Schema response received:', response);
 
       if (response && response.success) {
@@ -587,16 +542,17 @@ export default function ConnectionDialog({ open, connection, onClose, onSave }: 
 
   const handleSubmit = () => {
     if (connectionTested) {
-      let connectionAccessLevelValue: string;
+      // Update connectionAccessLevel based on isSource and isDestination
+      let connectionAccessLevelValue: string = connectionDetails.connectionAccessLevel;
 
-      if (formData.isSource && formData.isDestination) {
+      if (connectionDetails.isSource && connectionDetails.isDestination) {
         connectionAccessLevelValue = 'ReadWrite';
-      } else if (formData.isSource) {
+      } else if (connectionDetails.isSource) {
         connectionAccessLevelValue = 'ReadOnly';
-      } else if (formData.isDestination) {
+      } else if (connectionDetails.isDestination) {
         connectionAccessLevelValue = 'WriteOnly';
       } else {
-        connectionAccessLevelValue = 'ReadOnly';
+        connectionAccessLevelValue = 'ReadOnly'; // Default
       }
 
       // Always build a connection string that includes username and password
@@ -604,7 +560,7 @@ export default function ConnectionDialog({ open, connection, onClose, onSave }: 
 
       if (connectionMode === 'string') {
         // For connection string mode, ensure username and password are included
-        connectionString = formData.connectionString;
+        connectionString = connectionDetails.connectionString;
 
         // Make sure username and password are in the connection string
         if (connectionDetails.username && connectionDetails.password) {
@@ -627,33 +583,21 @@ export default function ConnectionDialog({ open, connection, onClose, onSave }: 
 
       console.log('Final connection string for saving:', connectionString);
 
-      // Create the form data with all necessary fields
-      const updatedFormData = {
-        ...formData,
-        connectionString,
+      // Create a standardized Connection object that matches our database model
+      const updatedConnection: Connection = {
+        ...connectionDetails,
+        connectionString: connectionString,
         connectionAccessLevel: connectionAccessLevelValue,
-        // Include connection details for debugging
-        connectionDetails: {
-          server: connectionDetails.server,
-          database: connectionDetails.database,
-          username: connectionDetails.username,
-          password: connectionDetails.password,
-          port: connectionDetails.port,
-          additionalParams: connectionDetails.additionalParams
-        },
-        // Include username and password directly in the connection object
-        username: connectionDetails.username,
-        password: connectionDetails.password,
-        createdBy: "System",
+        isConnectionValid: testResult?.success || false,
         lastModifiedBy: "System",
-        createdOn: new Date().toISOString(),
-        lastModifiedOn: new Date().toISOString()
+        lastModifiedOn: new Date().toISOString(),
+        // Ensure computed properties match the connectionAccessLevel
+        isSource: connectionAccessLevelValue === 'ReadOnly' || connectionAccessLevelValue === 'ReadWrite',
+        isDestination: connectionAccessLevelValue === 'WriteOnly' || connectionAccessLevelValue === 'ReadWrite'
       };
 
-      console.log('Saving connection with username:', connectionDetails.username);
-      console.log('Saving connection with password:', connectionDetails.password);
-      console.log('Saving connection with data:', updatedFormData);
-      onSave(updatedFormData);
+      console.log('Saving connection with data:', updatedConnection);
+      onSave(updatedConnection);
     } else {
       setTestResult({
         success: false,
@@ -662,62 +606,20 @@ export default function ConnectionDialog({ open, connection, onClose, onSave }: 
     }
   };
 
-  // This function is used when extracting connection details from a connection string
-  // It's kept here for future use
-  /*
-  const parseConnectionStringToObject = (connectionString: string) => {
-    const details: ConnectionDetails = {
-      server: '',
-      database: '',
-      username: '',
-      password: '',
-      port: '',
-      additionalParams: '',
-    };
-
-    try {
-      const params = connectionString.split(';');
-      params.forEach(param => {
-        const [key, value] = param.split('=');
-        if (!key || !value) return;
-
-        const keyLower = key.trim().toLowerCase();
-        const valueClean = value.trim();
-
-        if (keyLower === 'server' || keyLower === 'data source') {
-          details.server = valueClean;
-        } else if (keyLower === 'database' || keyLower === 'initial catalog') {
-          details.database = valueClean;
-        } else if (keyLower === 'user id' || keyLower === 'uid') {
-          details.username = valueClean;
-        } else if (keyLower === 'password' || keyLower === 'pwd') {
-          details.password = valueClean;
-        } else if (keyLower === 'port') {
-          details.port = valueClean;
-        }
-      });
-    } catch (error) {
-      console.error('Error parsing connection string:', error);
-    }
-
-    return details;
-  };
-  */
-
   return (
     <>
       <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
         <DialogTitle>
-          {formData.connectionId ? 'Edit Connection' : 'New Connection'}
+          {connectionDetails.connectionId ? 'Edit Connection' : 'New Connection'}
         </DialogTitle>
         <DialogContent>
           <Grid container spacing={2} sx={{ mt: 1 }}>
             {/* Basic connection info */}
             <ConnectionBasicInfo
-              connectionName={formData.connectionName}
-              connectionType={formData.connectionType}
-              onNameChange={handleChangeFixed}
-              onTypeChange={handleSelectChange}
+              connectionName={connectionDetails.connectionName}
+              connectionType="sqlServer" // Default to SQL Server for now
+              onNameChange={handleConnectionDetailsChange}
+              onTypeChange={handleConnectionDetailsChange}
             />
 
             {/* Connection mode tabs */}
@@ -735,9 +637,9 @@ export default function ConnectionDialog({ open, connection, onClose, onSave }: 
               {/* Connection String Form */}
               {connectionMode === 'string' && (
                 <ConnectionStringForm
-                  connectionString={formData.connectionString}
-                  connectionType={formData.connectionType}
-                  onChange={handleChangeFixed}
+                  connectionString={connectionDetails.connectionString}
+                  connectionType="sqlServer" // Default to SQL Server for now
+                  onChange={handleConnectionDetailsChange}
                 />
               )}
 
@@ -746,12 +648,12 @@ export default function ConnectionDialog({ open, connection, onClose, onSave }: 
                 <ConnectionDetailsForm
                   connectionDetails={connectionDetails}
                   formSettings={{
-                    timeout: formData.timeout,
-                    encrypt: formData.encrypt,
-                    trustServerCertificate: formData.trustServerCertificate
+                    timeout: connectionDetails.timeout,
+                    encrypt: connectionDetails.encrypt,
+                    trustServerCertificate: connectionDetails.trustServerCertificate
                   }}
                   onDetailsChange={handleConnectionDetailsChange}
-                  onSettingChange={handleChangeFixed}
+                  onSettingChange={handleConnectionDetailsChange}
                 />
               )}
             </Grid>
@@ -766,17 +668,17 @@ export default function ConnectionDialog({ open, connection, onClose, onSave }: 
             {/* Connection Settings (after successful test) */}
             <ConnectionSettings
               formData={{
-                description: formData.description,
-                connectionAccessLevel: formData.connectionAccessLevel,
-                isSource: formData.isSource,
-                isDestination: formData.isDestination,
-                isActive: formData.isActive,
-                lastTestedOn: formData.lastTestedOn,
-                maxPoolSize: formData.maxPoolSize,
-                minPoolSize: formData.minPoolSize
+                description: connectionDetails.description,
+                connectionAccessLevel: connectionDetails.connectionAccessLevel,
+                isSource: connectionDetails.isSource,
+                isDestination: connectionDetails.isDestination,
+                isActive: connectionDetails.isActive,
+                lastTestedOn: connectionDetails.lastTestedOn ? new Date(connectionDetails.lastTestedOn) : null,
+                maxPoolSize: connectionDetails.maxPoolSize,
+                minPoolSize: connectionDetails.minPoolSize
               }}
               connectionTested={connectionTested}
-              onFormChange={handleChangeFixed}
+              onFormChange={handleConnectionDetailsChange}
               onConnectionPurposeChange={handleConnectionPurposeChange}
             />
           </Grid>

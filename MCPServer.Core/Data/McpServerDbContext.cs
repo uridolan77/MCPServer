@@ -5,6 +5,7 @@ using MCPServer.Core.Models;
 using MCPServer.Core.Models.Auth;
 using MCPServer.Core.Models.Llm;
 using MCPServer.Core.Models.Rag;
+using MCPServer.Core.Models.DataTransfer;
 using MCPServer.Core.Data.DataSeeding;
 
 namespace MCPServer.Core.Data
@@ -38,6 +39,9 @@ namespace MCPServer.Core.Data
         public DbSet<LlmModel> LlmModels { get; set; } = null!;
         public DbSet<LlmProviderCredential> LlmProviderCredentials { get; set; } = null!;
         public DbSet<LlmUsageLog> LlmUsageLogs { get; set; } = null!;
+
+        // DataTransfer tables
+        public DbSet<DataTransferConnection> DataTransferConnections { get; set; } = null!;
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -290,6 +294,18 @@ namespace MCPServer.Core.Data
 
                 // Create index on SessionId for faster lookups
                 entity.HasIndex(e => e.SessionId);
+            });
+
+            // Configure DataTransferConnection entity
+            modelBuilder.Entity<DataTransferConnection>(entity =>
+            {
+                entity.HasKey(e => e.ConnectionId);
+                entity.Property(e => e.ConnectionName).IsRequired();
+                entity.Property(e => e.Server).IsRequired();
+                entity.Property(e => e.Database).IsRequired();
+                
+                // Create index on ConnectionName for faster lookups
+                entity.HasIndex(e => e.ConnectionName);
             });
 
             // Seed data using the consolidated approach

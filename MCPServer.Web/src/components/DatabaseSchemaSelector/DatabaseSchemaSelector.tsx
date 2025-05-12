@@ -114,14 +114,37 @@ export const DatabaseSchemaSelector: React.FC<DatabaseSchemaSelectorProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [normalizedSchema, setNormalizedSchema] = useState<SchemaItem[]>([]);
   
+  // Use a ref to store callback functions to avoid dependency changes
+  const callbacksRef = React.useRef({
+    updateFormData,
+    onSelectionChange,
+    onGenerateJson,
+    onSchemaLoaded
+  });
+  
+  // Update ref when callbacks change
+  React.useEffect(() => {
+    callbacksRef.current = {
+      updateFormData,
+      onSelectionChange,
+      onGenerateJson,
+      onSchemaLoaded
+    };
+  }, [updateFormData, onSelectionChange, onGenerateJson, onSchemaLoaded]);
+  
   // Fetch schema data when connectionId or connectionString changes
   const fetchDatabaseSchema = useCallback(async () => {
     if (!connectionId && !connectionString) {
+      console.log('No connection information provided to DatabaseSchemaSelector:', 
+        { connectionId, connectionString });
       setError('No connection information provided');
-      onSchemaLoaded?.(false);
+      callbacksRef.current.onSchemaLoaded?.(false);
       return;
     }
 
+    // Debug the connectionId value
+    console.log('fetchDatabaseSchema: Using connectionId:', connectionId);
+    
     setIsLoading(true);
     setError(null);
     
@@ -205,7 +228,7 @@ export const DatabaseSchemaSelector: React.FC<DatabaseSchemaSelectorProps> = ({
         setDatabaseName('Database');
       }
       
-      onSchemaLoaded?.(true);
+      callbacksRef.current.onSchemaLoaded?.(true);
     } catch (error: any) {
       console.error('Error fetching database schema:', error);
       let errorMessage = 'Failed to load database schema';
@@ -230,11 +253,11 @@ export const DatabaseSchemaSelector: React.FC<DatabaseSchemaSelectorProps> = ({
       
       console.log('Error message to display:', errorMessage);
       setError(errorMessage);
-      onSchemaLoaded?.(false);
+      callbacksRef.current.onSchemaLoaded?.(false);
     } finally {
       setIsLoading(false);
     }
-  }, [connectionId, connectionString, databaseName, onSchemaLoaded]);
+  }, [connectionId, connectionString]);
   
   // Process schema data when it changes
   useEffect(() => {
@@ -333,22 +356,22 @@ export const DatabaseSchemaSelector: React.FC<DatabaseSchemaSelectorProps> = ({
       console.log('Processed schema:', processedSchema);
       setNormalizedSchema(processedSchema);
       
-      // Update parent component with the processed schema
-      if (updateFormData) {
-        updateFormData({
+      // Use callbacksRef to avoid dependency cycles
+      if (callbacksRef.current.updateFormData) {
+        callbacksRef.current.updateFormData({
           schema: processedSchema,
           databaseName
         });
       }
       
       // Notify parent about selection change
-      onSelectionChange?.(processedSchema.filter(t => t.selected));
+      callbacksRef.current.onSelectionChange?.(processedSchema.filter(t => t.selected));
     } catch (error: any) {
       console.error('Error processing schema data:', error);
       setError(error.message || 'Error processing schema data');
       setNormalizedSchema([]);
     }
-  }, [schema, initialSelectedTables, databaseName, updateFormData, onSelectionChange]);
+  }, [schema, initialSelectedTables]);
   
   // Initial data fetch
   useEffect(() => {
@@ -393,12 +416,12 @@ export const DatabaseSchemaSelector: React.FC<DatabaseSchemaSelectorProps> = ({
         }));
       }
       
-      // Notify parent about selection change
-      onSelectionChange?.(updated.filter(t => t.selected));
+      // Notify parent about selection change using callbacksRef
+      callbacksRef.current.onSelectionChange?.(updated.filter(t => t.selected));
       
-      // Update form data if in wizard
-      if (updateFormData) {
-        updateFormData({ schema: updated });
+      // Update form data if in wizard using callbacksRef
+      if (callbacksRef.current.updateFormData) {
+        callbacksRef.current.updateFormData({ schema: updated });
       }
       
       return updated;
@@ -416,12 +439,12 @@ export const DatabaseSchemaSelector: React.FC<DatabaseSchemaSelectorProps> = ({
         updated[tableIndex].selected = true;
       }
       
-      // Notify parent about selection change
-      onSelectionChange?.(updated.filter(t => t.selected));
+      // Notify parent about selection change using callbacksRef
+      callbacksRef.current.onSelectionChange?.(updated.filter(t => t.selected));
       
-      // Update form data if in wizard
-      if (updateFormData) {
-        updateFormData({ schema: updated });
+      // Update form data if in wizard using callbacksRef
+      if (callbacksRef.current.updateFormData) {
+        callbacksRef.current.updateFormData({ schema: updated });
       }
       
       return updated;
@@ -440,12 +463,12 @@ export const DatabaseSchemaSelector: React.FC<DatabaseSchemaSelectorProps> = ({
         }))
       }));
       
-      // Notify parent about selection change
-      onSelectionChange?.(updated.filter(t => t.selected));
+      // Notify parent about selection change using callbacksRef
+      callbacksRef.current.onSelectionChange?.(updated.filter(t => t.selected));
       
-      // Update form data if in wizard
-      if (updateFormData) {
-        updateFormData({ schema: updated });
+      // Update form data if in wizard using callbacksRef
+      if (callbacksRef.current.updateFormData) {
+        callbacksRef.current.updateFormData({ schema: updated });
       }
       
       return updated;
@@ -467,12 +490,12 @@ export const DatabaseSchemaSelector: React.FC<DatabaseSchemaSelectorProps> = ({
         selected
       }));
       
-      // Notify parent about selection change
-      onSelectionChange?.(updated.filter(t => t.selected));
+      // Notify parent about selection change using callbacksRef
+      callbacksRef.current.onSelectionChange?.(updated.filter(t => t.selected));
       
-      // Update form data if in wizard
-      if (updateFormData) {
-        updateFormData({ schema: updated });
+      // Update form data if in wizard using callbacksRef
+      if (callbacksRef.current.updateFormData) {
+        callbacksRef.current.updateFormData({ schema: updated });
       }
       
       return updated;
@@ -666,7 +689,7 @@ export const DatabaseSchemaSelector: React.FC<DatabaseSchemaSelectorProps> = ({
       const json = JSON.stringify(metaSchema, null, 2);
       
       // Call the callback with the generated JSON
-      onGenerateJson?.(json);
+      callbacksRef.current.onGenerateJson?.(json);
       
       // Update form data if in wizard
       if (updateFormData) {
@@ -682,7 +705,8 @@ export const DatabaseSchemaSelector: React.FC<DatabaseSchemaSelectorProps> = ({
       setError(error.message || 'Failed to generate schema JSON');
       return '';
     }
-  }, [normalizedSchema, databaseName, onGenerateJson, updateFormData]);
+  // Remove databaseName from dependency array to prevent infinite updates
+  }, [normalizedSchema, callbacksRef]);
   
   // Render table columns with checkboxes
   const renderColumns = (tableIndex: number, columns: Column[]) => {

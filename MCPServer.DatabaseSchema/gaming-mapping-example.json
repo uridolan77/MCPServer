@@ -1,0 +1,1523 @@
+{
+  "metadata": {
+    "id": "gaming-odbd-slod-mapping-v1",
+    "version": "1.0.0",
+    "name": "Gaming Platform ODBD to SLOD Mapping",
+    "description": "Mapping between the gaming platform database schema and semantic ontology",
+    "created": "2025-05-06T12:00:00Z",
+    "modified": "2025-05-06T12:00:00Z",
+    "authors": ["ProgressPlay Data Team"],
+    "sourceSchemaId": "gaming-platform-odbd-v1",
+    "targetOntologyId": "gaming-industry-slod-v1"
+  },
+  "connections": [
+    {
+      "id": "gaming-db-source",
+      "name": "Gaming Platform Database",
+      "description": "Connection to the gaming platform SQL Server database",
+      "type": "source",
+      "system": "database",
+      "dialect": "sqlserver",
+      "connectionString": "${DB_CONNECTION_STRING}"
+    },
+    {
+      "id": "gaming-ontology-target",
+      "name": "Gaming Industry Ontology",
+      "description": "Connection to the gaming industry ontology",
+      "type": "target",
+      "system": "ontology",
+      "dialect": "json"
+    }
+  ],
+  "entityMappings": [
+    {
+      "id": "player-mapping",
+      "name": "Player Mapping",
+      "description": "Maps player data from the database to the semantic model",
+      "sourceTable": "tbl_Daily_actions_players",
+      "sourceSchema": "common",
+      "targetEntity": "Player",
+      "identityMapping": {
+        "type": "column",
+        "sourceColumns": ["PlayerID"]
+      },
+      "propertyMappings": [
+        {
+          "sourceColumn": "PlayerID",
+          "targetProperty": "playerID"
+        },
+        {
+          "sourceColumn": "Alias",
+          "targetProperty": "alias"
+        },
+        {
+          "sourceColumn": "RegisteredDate",
+          "targetProperty": "registrationDate"
+        },
+        {
+          "sourceColumn": "FirstDepositDate",
+          "targetProperty": "firstDepositDate"
+        },
+        {
+          "sourceColumn": "LastLoginDate",
+          "targetProperty": "lastLoginDate"
+        },
+        {
+          "sourceColumn": "DateOfBirth",
+          "targetProperty": "dateOfBirth"
+        },
+        {
+          "sourceColumn": "Gender",
+          "targetProperty": "gender"
+        },
+        {
+          "sourceColumn": "Country",
+          "targetProperty": "country"
+        },
+        {
+          "sourceColumn": "Currency",
+          "targetProperty": "currency"
+        },
+        {
+          "sourceColumn": "Balance",
+          "targetProperty": "balance"
+        },
+        {
+          "sourceColumn": "AccountBalance",
+          "targetProperty": "accountBalance"
+        },
+        {
+          "sourceColumn": "BonusBalance",
+          "targetProperty": "bonusBalance"
+        },
+        {
+          "sourceColumn": "AffiliateID",
+          "targetProperty": "affiliateID"
+        },
+        {
+          "sourceColumn": "Language",
+          "targetProperty": "language"
+        },
+        {
+          "sourceColumn": "RegisteredPlatform",
+          "targetProperty": "registeredPlatform"
+        },
+        {
+          "sourceColumn": "Email",
+          "targetProperty": "email"
+        },
+        {
+          "sourceColumn": "IsOptIn",
+          "targetProperty": "isOptIn"
+        },
+        {
+          "sourceColumn": "IsBlocked",
+          "targetProperty": "isBlocked"
+        },
+        {
+          "sourceColumn": "IsTest",
+          "targetProperty": "isTest"
+        },
+        {
+          "sourceColumn": "VIPLevel",
+          "targetProperty": "vipLevel"
+        },
+        {
+          "sourceColumn": "TotalDeposits",
+          "targetProperty": "totalDeposits"
+        },
+        {
+          "sourceColumn": "TotalWithdrawals",
+          "targetProperty": "totalWithdrawals"
+        },
+        {
+          "sourceColumn": "FirstName",
+          "targetProperty": "firstName"
+        },
+        {
+          "sourceColumn": "LastName",
+          "targetProperty": "lastName"
+        },
+        {
+          "sourceColumn": "CustomerClubPoints",
+          "targetProperty": "customerClubPoints"
+        },
+        {
+          "sourceColumn": "Wagered",
+          "targetProperty": "wagered"
+        },
+        {
+          "sourceColumn": "CasinoID",
+          "targetProperty": "casinoID"
+        },
+        {
+          "sourceColumn": "RevenueEUR",
+          "targetProperty": "revenueEUR"
+        },
+        {
+          "sourceColumn": "LastLoginPlatform",
+          "targetProperty": "lastLoginPlatform"
+        },
+        {
+          "sourceColumn": "TotalBetsCasino",
+          "targetProperty": "totalBetsCasino"
+        },
+        {
+          "sourceColumn": "TotalBetsSport",
+          "targetProperty": "totalBetsSport"
+        },
+        {
+          "sourceColumn": "DepositsCountCasino",
+          "targetProperty": "depositsCountCasino"
+        },
+        {
+          "sourceColumn": "DepositsCountSport",
+          "targetProperty": "depositsCountSport"
+        },
+        {
+          "sourceColumn": "FirstDepositMethod",
+          "targetProperty": "firstDepositMethod"
+        },
+        {
+          "sourceColumn": "LastDepositMethod",
+          "targetProperty": "lastDepositMethod"
+        },
+        {
+          "sourceColumn": "AffordabilityStatus",
+          "targetProperty": "affordabilityStatus"
+        },
+        {
+          "sourceColumn": "AffordabilityBalance",
+          "targetProperty": "affordabilityBalance"
+        },
+        {
+          "sourceExpression": "CASE WHEN Status = 'Active' THEN 'Active' WHEN Status = 'Suspended' THEN 'Suspended' WHEN Status = 'Blocked' THEN 'Blocked' ELSE 'Unknown' END",
+          "targetProperty": "playerStatus",
+          "transformation": "mapValue",
+          "transformationParameters": {
+            "mapping": {
+              "Active": "Active",
+              "Suspended": "Suspended",
+              "Blocked": "Blocked",
+              "Closed": "Closed",
+              "SelfExcluded": "SelfExcluded",
+              "Pending": "PendingVerification",
+              "Dormant": "Dormant",
+              "Unknown": "Unknown"
+            }
+          }
+        },
+        {
+          "sourceColumn": "DocumentsStatus",
+          "targetProperty": "kycStatus",
+          "transformation": "mapValue",
+          "transformationParameters": {
+            "mapping": {
+              "Verified": "Verified",
+              "Pending": "Pending",
+              "Rejected": "Rejected",
+              "Not Submitted": "NotSubmitted",
+              "Partially Verified": "PartiallyVerified",
+              "Verification Required": "VerificationRequired"
+            }
+          }
+        },
+        {
+          "sourceExpression": "{\"promotionalCasinoEmail\": PromotionalCasinoEmailEnabled, \"promotionalCasinoSMS\": PromotionalCasinoSMSEnabled, \"promotionalSportsEmail\": PromotionalSportsEmailEnabled, \"promotionalSportsSMS\": PromotionalSportsSMSEnabled, \"promotionalPush\": PromotionalPushEnabled, \"promotionalPhone\": PromotionalPhoneEnabled, \"promotionalPost\": PromotionalPostEnabled, \"promotionalPartner\": PromotionalPartnerEnabled}",
+          "targetProperty": "communicationPreferences",
+          "transformation": "jsonToPreferences"
+        }
+      ]
+    },
+    {
+      "id": "game-mapping",
+      "name": "Game Mapping",
+      "description": "Maps game data from the database to the semantic model",
+      "sourceTable": "Games",
+      "sourceSchema": "dbo",
+      "targetEntity": "Game",
+      "identityMapping": {
+        "type": "column",
+        "sourceColumns": ["GameID"]
+      },
+      "propertyMappings": [
+        {
+          "sourceColumn": "GameID",
+          "targetProperty": "gameID"
+        },
+        {
+          "sourceColumn": "GameName",
+          "targetProperty": "gameName"
+        },
+        {
+          "sourceColumn": "Provider",
+          "targetProperty": "provider"
+        },
+        {
+          "sourceColumn": "SubProvider",
+          "targetProperty": "subProvider"
+        },
+        {
+          "sourceColumn": "GameType",
+          "targetProperty": "gameType",
+          "transformation": "mapValue",
+          "transformationParameters": {
+            "mapping": {
+              "Slots": "Slots",
+              "Table Games": "TableGames",
+              "Live Casino": "LiveDealer",
+              "Jackpot": "Jackpot",
+              "Video Poker": "VideoPoker",
+              "Bingo": "Bingo",
+              "Scratch Cards": "Scratch",
+              "Virtual Sports": "Virtual",
+              "Other": "Other"
+            }
+          }
+        },
+        {
+          "sourceColumn": "GameFilters",
+          "targetProperty": "gameFilters"
+        },
+        {
+          "sourceColumn": "GameOrder",
+          "targetProperty": "gameOrder"
+        },
+        {
+          "sourceColumn": "IsActive",
+          "targetProperty": "isActive"
+        },
+        {
+          "sourceColumn": "DemoEnabled",
+          "targetProperty": "demoEnabled"
+        },
+        {
+          "sourceColumn": "WagerPercent",
+          "targetProperty": "wagerPercent"
+        },
+        {
+          "sourceColumn": "JackpotContribution",
+          "targetProperty": "jackpotContribution"
+        },
+        {
+          "sourceColumn": "PayoutLow",
+          "targetProperty": "payoutLow"
+        },
+        {
+          "sourceColumn": "PayoutHigh",
+          "targetProperty": "payoutHigh"
+        },
+        {
+          "sourceColumn": "Volatility",
+          "targetProperty": "volatility"
+        },
+        {
+          "sourceColumn": "UKCompliant",
+          "targetProperty": "ukCompliant"
+        },
+        {
+          "sourceColumn": "IsDesktop",
+          "targetProperty": "isDesktop"
+        },
+        {
+          "sourceColumn": "IsMobile",
+          "targetProperty": "isMobile"
+        },
+        {
+          "sourceColumn": "ServerGameID",
+          "targetProperty": "serverGameID"
+        },
+        {
+          "sourceColumn": "CreatedDate",
+          "targetProperty": "createdDate"
+        },
+        {
+          "sourceColumn": "ReleaseDate",
+          "targetProperty": "releaseDate"
+        },
+        {
+          "sourceColumn": "UpdatedDate",
+          "targetProperty": "updatedDate"
+        },
+        {
+          "sourceColumn": "HideInLobby",
+          "targetProperty": "hideInLobby"
+        },
+        {
+          "sourceColumn": "ExcludedCountries",
+          "targetProperty": "excludedCountries"
+        },
+        {
+          "sourceColumn": "ExcludedJurisdictions",
+          "targetProperty": "excludedJurisdictions"
+        },
+        {
+          "sourceExpression": "(PayoutLow + PayoutHigh) / 2",
+          "targetProperty": "returnToPlayer"
+        },
+        {
+          "sourceExpression": "CASE WHEN JackpotContribution > 0 THEN 1 ELSE 0 END",
+          "targetProperty": "hasJackpot"
+        }
+      ],
+      "joinConditions": [
+        {
+          "sourceTable": "GamesDescriptions",
+          "sourceSchema": "dbo",
+          "sourceColumn": "GameID",
+          "targetTable": "Games",
+          "targetSchema": "dbo",
+          "targetColumn": "GameID",
+          "joinType": "left"
+        }
+      ]
+    },
+    {
+      "id": "transaction-mapping",
+      "name": "Transaction Mapping",
+      "description": "Maps transaction data from the database to the semantic model",
+      "sourceTable": "tbl_Daily_actions_transactions",
+      "sourceSchema": "common",
+      "targetEntity": "Transaction",
+      "identityMapping": {
+        "type": "column",
+        "sourceColumns": ["TransactionID"]
+      },
+      "propertyMappings": [
+        {
+          "sourceColumn": "TransactionID",
+          "targetProperty": "transactionID"
+        },
+        {
+          "sourceColumn": "PlayerID",
+          "targetProperty": "playerID"
+        },
+        {
+          "sourceColumn": "TransactionDate",
+          "targetProperty": "transactionDate"
+        },
+        {
+          "sourceColumn": "TransactionType",
+          "targetProperty": "transactionType",
+          "transformation": "mapValue",
+          "transformationParameters": {
+            "mapping": {
+              "Deposit": "Deposit",
+              "Withdrawal": "Withdrawal",
+              "Bonus": "BonusIssue",
+              "BonusRelease": "BonusRelease",
+              "Bet": "GameBet",
+              "Win": "GameWin",
+              "Adjustment": "Adjustment",
+              "Chargeback": "Chargeback",
+              "Refund": "Refund",
+              "Fee": "Fee",
+              "SportBet": "SportBet",
+              "SportWin": "SportWin"
+            }
+          }
+        },
+        {
+          "sourceColumn": "TransactionAmount",
+          "targetProperty": "transactionAmount"
+        },
+        {
+          "sourceColumn": "TransactionOriginalAmount",
+          "targetProperty": "transactionOriginalAmount"
+        },
+        {
+          "sourceColumn": "TransactionDetails",
+          "targetProperty": "transactionDetails"
+        },
+        {
+          "sourceColumn": "Platform",
+          "targetProperty": "platform"
+        },
+        {
+          "sourceColumn": "Status",
+          "targetProperty": "status",
+          "transformation": "mapValue",
+          "transformationParameters": {
+            "mapping": {
+              "Pending": "Pending",
+              "Completed": "Completed",
+              "Failed": "Failed",
+              "Cancelled": "Cancelled",
+              "Refunded": "Refunded",
+              "Processing": "Processing"
+            }
+          }
+        },
+        {
+          "sourceColumn": "CurrencyCode",
+          "targetProperty": "currencyCode"
+        },
+        {
+          "sourceColumn": "PaymentMethod",
+          "targetProperty": "paymentMethod"
+        },
+        {
+          "sourceColumn": "PaymentProvider",
+          "targetProperty": "paymentProvider"
+        }
+      ]
+    },
+    {
+      "id": "bonus-mapping",
+      "name": "Bonus Mapping",
+      "description": "Maps bonus data from the database to the semantic model",
+      "sourceTable": "tbl_Bonuses",
+      "sourceSchema": "common",
+      "targetEntity": "Bonus",
+      "identityMapping": {
+        "type": "column",
+        "sourceColumns": ["BonusID"]
+      },
+      "propertyMappings": [
+        {
+          "sourceColumn": "BonusID",
+          "targetProperty": "bonusID"
+        },
+        {
+          "sourceColumn": "BonusName",
+          "targetProperty": "bonusName"
+        },
+        {
+          "sourceColumn": "InternalName",
+          "targetProperty": "internalName"
+        },
+        {
+          "sourceColumn": "Description",
+          "targetProperty": "description"
+        },
+        {
+          "sourceColumn": "Percentage",
+          "targetProperty": "percentage"
+        },
+        {
+          "sourceColumn": "PercentageUpToAmount",
+          "targetProperty": "percentageUpToAmount"
+        },
+        {
+          "sourceColumn": "Divisions",
+          "targetProperty": "divisions"
+        },
+        {
+          "sourceColumn": "BonusAmount",
+          "targetProperty": "bonusAmount"
+        },
+        {
+          "sourceColumn": "Status",
+          "targetProperty": "status"
+        },
+        {
+          "sourceColumn": "CouponCode",
+          "targetProperty": "couponCode"
+        },
+        {
+          "sourceColumn": "GivenUpon",
+          "targetProperty": "givenUpon"
+        },
+        {
+          "sourceColumn": "StartDate",
+          "targetProperty": "startDate"
+        },
+        {
+          "sourceColumn": "EndDate",
+          "targetProperty": "endDate"
+        },
+        {
+          "sourceColumn": "WagerFactor",
+          "targetProperty": "wagerFactor"
+        },
+        {
+          "sourceColumn": "MinDeposit",
+          "targetProperty": "minDeposit"
+        },
+        {
+          "sourceColumn": "BonusType",
+          "targetProperty": "bonusType",
+          "transformation": "mapValue",
+          "transformationParameters": {
+            "mapping": {
+              "Welcome": "Welcome",
+              "Deposit": "Deposit",
+              "NoDeposit": "NoDeposit",
+              "FreeSpins": "FreeSpins",
+              "Cashback": "Cashback",
+              "Reload": "Reload",
+              "Loyalty": "Loyalty",
+              "Referral": "Referral",
+              "Tournament": "Tournament",
+              "FreeBet": "FreeBet",
+              "BetInsurance": "BetInsurance"
+            }
+          }
+        },
+        {
+          "sourceColumn": "IsSportBonus",
+          "targetProperty": "isSportBonus"
+        }
+      ]
+    },
+    {
+      "id": "bonus-balance-mapping",
+      "name": "Bonus Balance Mapping",
+      "description": "Maps bonus balance data from the database to the semantic model",
+      "sourceTable": "tbl_Bonus_balances",
+      "sourceSchema": "common",
+      "targetEntity": "BonusBalance",
+      "identityMapping": {
+        "type": "column",
+        "sourceColumns": ["BonusBalanceID"]
+      },
+      "propertyMappings": [
+        {
+          "sourceColumn": "BonusBalanceID",
+          "targetProperty": "bonusBalanceID"
+        },
+        {
+          "sourceColumn": "PlayerID",
+          "targetProperty": "playerID"
+        },
+        {
+          "sourceColumn": "BonusID",
+          "targetProperty": "bonusID"
+        },
+        {
+          "sourceColumn": "Amount",
+          "targetProperty": "amount"
+        },
+        {
+          "sourceColumn": "Balance",
+          "targetProperty": "balance"
+        },
+        {
+          "sourceColumn": "Status",
+          "targetProperty": "status"
+        },
+        {
+          "sourceColumn": "WagerLeft",
+          "targetProperty": "wagerLeft"
+        },
+        {
+          "sourceColumn": "OriginalDepositAmount",
+          "targetProperty": "originalDepositAmount"
+        },
+        {
+          "sourceColumn": "MaxCashableWinnings",
+          "targetProperty": "maxCashableWinnings"
+        },
+        {
+          "sourceColumn": "AmountConverted",
+          "targetProperty": "amountConverted"
+        },
+        {
+          "sourceColumn": "IsSportBonus",
+          "targetProperty": "isSportBonus"
+        },
+        {
+          "sourceColumn": "FreeSpinsOffer",
+          "targetProperty": "freeSpinsOffer"
+        },
+        {
+          "sourceColumn": "FreeSpinsAmount",
+          "targetProperty": "freeSpinsAmount"
+        },
+        {
+          "sourceColumn": "FreeSpinsLeft",
+          "targetProperty": "freeSpinsLeft"
+        },
+        {
+          "sourceColumn": "CreationDate",
+          "targetProperty": "creationDate"
+        },
+        {
+          "sourceColumn": "LossConditionDate",
+          "targetProperty": "lossConditionDate"
+        }
+      ]
+    },
+    {
+      "id": "country-mapping",
+      "name": "Country Mapping",
+      "description": "Maps country data from the database to the semantic model",
+      "sourceTable": "tbl_Countries",
+      "sourceSchema": "common",
+      "targetEntity": "Country",
+      "identityMapping": {
+        "type": "column",
+        "sourceColumns": ["CountryID"]
+      },
+      "propertyMappings": [
+        {
+          "sourceColumn": "CountryID",
+          "targetProperty": "countryID"
+        },
+        {
+          "sourceColumn": "CountryName",
+          "targetProperty": "countryName"
+        },
+        {
+          "sourceColumn": "IsActive",
+          "targetProperty": "isActive"
+        },
+        {
+          "sourceColumn": "CountryIntlCode",
+          "targetProperty": "countryIntlCode"
+        },
+        {
+          "sourceColumn": "PhoneCode",
+          "targetProperty": "phoneCode"
+        },
+        {
+          "sourceColumn": "IsoCode",
+          "targetProperty": "isoCode"
+        },
+        {
+          "sourceColumn": "JurisdictionCode",
+          "targetProperty": "jurisdictionCode"
+        },
+        {
+          "sourceColumn": "DefaultLanguage",
+          "targetProperty": "defaultLanguage"
+        },
+        {
+          "sourceColumn": "DefaultCurrency",
+          "targetProperty": "defaultCurrency"
+        },
+        {
+          "sourceColumn": "JurisdictionID",
+          "targetProperty": "jurisdictionID"
+        }
+      ]
+    },
+    {
+      "id": "currency-mapping",
+      "name": "Currency Mapping",
+      "description": "Maps currency data from the database to the semantic model",
+      "sourceTable": "tbl_Currencies",
+      "sourceSchema": "common",
+      "targetEntity": "Currency",
+      "identityMapping": {
+        "type": "column",
+        "sourceColumns": ["CurrencyID"]
+      },
+      "propertyMappings": [
+        {
+          "sourceColumn": "CurrencyID",
+          "targetProperty": "currencyID"
+        },
+        {
+          "sourceColumn": "CurrencyName",
+          "targetProperty": "currencyName"
+        },
+        {
+          "sourceColumn": "CurrencySymbol",
+          "targetProperty": "currencySymbol"
+        },
+        {
+          "sourceColumn": "CurrencyCode",
+          "targetProperty": "currencyCode"
+        },
+        {
+          "sourceColumn": "RateInEUR",
+          "targetProperty": "rateInEUR"
+        },
+        {
+          "sourceColumn": "RateInUSD",
+          "targetProperty": "rateInUSD"
+        },
+        {
+          "sourceColumn": "RateInGBP",
+          "targetProperty": "rateInGBP"
+        },
+        {
+          "sourceColumn": "Multiplier",
+          "targetProperty": "multiplier"
+        },
+        {
+          "sourceColumn": "ForLanguages",
+          "targetProperty": "forLanguages"
+        }
+      ]
+    },
+    {
+      "id": "white-label-mapping",
+      "name": "White Label Mapping",
+      "description": "Maps white label data from the database to the semantic model",
+      "sourceTable": "tbl_White_labels",
+      "sourceSchema": "common",
+      "targetEntity": "WhiteLabel",
+      "identityMapping": {
+        "type": "column",
+        "sourceColumns": ["LabelID"]
+      },
+      "propertyMappings": [
+        {
+          "sourceColumn": "LabelID",
+          "targetProperty": "labelID"
+        },
+        {
+          "sourceColumn": "LabelName",
+          "targetProperty": "labelName"
+        },
+        {
+          "sourceColumn": "LabelUrlName",
+          "targetProperty": "labelUrlName"
+        },
+        {
+          "sourceColumn": "LabelUrl",
+          "targetProperty": "labelUrl"
+        },
+        {
+          "sourceColumn": "DefaultLanguage",
+          "targetProperty": "defaultLanguage"
+        },
+        {
+          "sourceColumn": "DefaultCountry",
+          "targetProperty": "defaultCountry"
+        },
+        {
+          "sourceColumn": "DefaultCurrency",
+          "targetProperty": "defaultCurrency"
+        },
+        {
+          "sourceColumn": "WelcomeBonusDesc",
+          "targetProperty": "welcomeBonusDesc"
+        },
+        {
+          "sourceColumn": "RestrictedCountries",
+          "targetProperty": "restrictedCountries"
+        },
+        {
+          "sourceColumn": "FoundedYear",
+          "targetProperty": "foundedYear"
+        },
+        {
+          "sourceColumn": "SportEnabled",
+          "targetProperty": "sportEnabled"
+        },
+        {
+          "sourceColumn": "DefaultPlayMode",
+          "targetProperty": "defaultPlayMode"
+        },
+        {
+          "sourceColumn": "IsActive",
+          "targetProperty": "isActive"
+        },
+        {
+          "sourceColumn": "LabelTitle",
+          "targetProperty": "labelTitle"
+        },
+        {
+          "sourceColumn": "ExcludedJurisdictions",
+          "targetProperty": "excludedJurisdictions"
+        }
+      ]
+    },
+    {
+      "id": "game-session-mapping",
+      "name": "Game Session Mapping",
+      "description": "Maps game session data from the database to the semantic model",
+      "sourceTable": "GamesCasinoSessions",
+      "sourceSchema": "dbo",
+      "targetEntity": "GameSession",
+      "identityMapping": {
+        "type": "column",
+        "sourceColumns": ["ID"]
+      },
+      "propertyMappings": [
+        {
+          "sourceColumn": "ID",
+          "targetProperty": "sessionID"
+        },
+        {
+          "sourceColumn": "GameID",
+          "targetProperty": "gameID"
+        },
+        {
+          "sourceColumn": "PlayerID",
+          "targetProperty": "playerID"
+        },
+        {
+          "sourceColumn": "TotalBet",
+          "targetProperty": "totalBet"
+        },
+        {
+          "sourceColumn": "TotalBetAccount",
+          "targetProperty": "totalBetAccount"
+        },
+        {
+          "sourceColumn": "TotalBetBonus",
+          "targetProperty": "totalBetBonus"
+        },
+        {
+          "sourceColumn": "TotalWin",
+          "targetProperty": "totalWin"
+        },
+        {
+          "sourceColumn": "TotalWinAccount",
+          "targetProperty": "totalWinAccount"
+        },
+        {
+          "sourceColumn": "TotalWinBonus",
+          "targetProperty": "totalWinBonus"
+        },
+        {
+          "sourceColumn": "RoundID",
+          "targetProperty": "roundID"
+        },
+        {
+          "sourceColumn": "GameStatus",
+          "targetProperty": "gameStatus"
+        },
+        {
+          "sourceColumn": "CurrencyID",
+          "targetProperty": "currencyID"
+        },
+        {
+          "sourceColumn": "CreationDate",
+          "targetProperty": "creationDate"
+        },
+        {
+          "sourceColumn": "UpdatedDate",
+          "targetProperty": "updatedDate"
+        },
+        {
+          "sourceColumn": "AccountBalance",
+          "targetProperty": "accountBalance"
+        },
+        {
+          "sourceColumn": "BonusBalance",
+          "targetProperty": "bonusBalance"
+        }
+      ]
+    },
+    {
+      "id": "sport-bet-mapping",
+      "name": "Sport Bet Mapping",
+      "description": "Maps sport bet data from the database to the semantic model",
+      "sourceTable": "SportBetsEnhanced",
+      "sourceSchema": "dbo",
+      "targetEntity": "SportBet",
+      "identityMapping": {
+        "type": "composite",
+        "sourceColumns": ["PlayerId", "BetId"]
+      },
+      "propertyMappings": [
+        {
+          "sourceColumn": "BetId",
+          "targetProperty": "betID"
+        },
+        {
+          "sourceColumn": "PlayerId",
+          "targetProperty": "playerID"
+        },
+        {
+          "sourceColumn": "RelativeBet",
+          "targetProperty": "betAmount"
+        },
+        {
+          "sourceExpression": "RelativeBet * (OddTypeId / 100.0)",
+          "targetProperty": "potentialWin"
+        },
+        {
+          "sourceColumn": "RelativeWin",
+          "targetProperty": "actualWin"
+        },
+        {
+          "sourceColumn": "BetType",
+          "targetProperty": "betType"
+        },
+        {
+          "sourceColumn": "OddTypeId",
+          "targetProperty": "oddTypeID"
+        },
+        {
+          "sourceColumn": "SportId",
+          "targetProperty": "sportID"
+        },
+        {
+          "sourceColumn": "RegionId",
+          "targetProperty": "regionID"
+        },
+        {
+          "sourceColumn": "CompetitionId",
+          "targetProperty": "competitionID"
+        },
+        {
+          "sourceColumn": "MatchId",
+          "targetProperty": "matchID"
+        },
+        {
+          "sourceColumn": "MarketId",
+          "targetProperty": "marketID"
+        },
+        {
+          "sourceColumn": "IsLive",
+          "targetProperty": "isLive"
+        },
+        {
+          "sourceColumn": "BetState",
+          "targetProperty": "betState"
+        },
+        {
+          "sourceColumn": "UpdatedDate",
+          "targetProperty": "placedDate"
+        },
+        {
+          "sourceColumn": "LastUpdate",
+          "targetProperty": "settledDate",
+          "condition": "BetState != 1"
+        },
+        {
+          "sourceColumn": "OddTypeId",
+          "targetProperty": "odds",
+          "transformation": "divideBy100"
+        }
+      ],
+      "joinConditions": [
+        {
+          "sourceTable": "SportMatches",
+          "sourceSchema": "dbo",
+          "sourceColumn": "MatchID",
+          "targetTable": "SportBetsEnhanced",
+          "targetSchema": "dbo",
+          "targetColumn": "MatchId",
+          "joinType": "left"
+        }
+      ]
+    },
+    {
+      "id": "big-winner-mapping",
+      "name": "Big Winner Mapping",
+      "description": "Maps big winner data from the database to the semantic model",
+      "sourceTable": "BigWinners",
+      "sourceSchema": "dbo",
+      "targetEntity": "BigWinner",
+      "identityMapping": {
+        "type": "column",
+        "sourceColumns": ["TransactionID"]
+      },
+      "propertyMappings": [
+        {
+          "sourceColumn": "TransactionID",
+          "targetProperty": "transactionID"
+        },
+        {
+          "sourceColumn": "PlayerID",
+          "targetProperty": "playerID"
+        },
+        {
+          "sourceColumn": "GameID",
+          "targetProperty": "gameID"
+        },
+        {
+          "sourceColumn": "Amount",
+          "targetProperty": "amount"
+        },
+        {
+          "sourceColumn": "Date",
+          "targetProperty": "date"
+        }
+      ],
+      "joinConditions": [
+        {
+          "sourceTable": "V_BigWinners",
+          "sourceSchema": "dbo",
+          "sourceColumn": "TransactionID",
+          "targetTable": "BigWinners",
+          "targetSchema": "dbo",
+          "targetColumn": "TransactionID",
+          "joinType": "left"
+        }
+      ]
+    },
+    {
+      "id": "withdrawal-request-mapping",
+      "name": "Withdrawal Request Mapping",
+      "description": "Maps withdrawal request data from the database to the semantic model",
+      "sourceTable": "tbl_Withdrawal_requests",
+      "sourceSchema": "common",
+      "targetEntity": "WithdrawalRequest",
+      "identityMapping": {
+        "type": "column",
+        "sourceColumns": ["RequestID"]
+      },
+      "propertyMappings": [
+        {
+          "sourceColumn": "RequestID",
+          "targetProperty": "requestID"
+        },
+        {
+          "sourceColumn": "PlayerID",
+          "targetProperty": "playerID"
+        },
+        {
+          "sourceColumn": "RequestDate",
+          "targetProperty": "requestDate"
+        },
+        {
+          "sourceColumn": "Amount",
+          "targetProperty": "amount"
+        },
+        {
+          "sourceColumn": "Status",
+          "targetProperty": "status"
+        },
+        {
+          "sourceColumn": "HandlingType",
+          "targetProperty": "handlingType"
+        },
+        {
+          "sourceColumn": "SCName",
+          "targetProperty": "withdrawalMethod"
+        },
+        {
+          "sourceColumn": "UpdatedDate",
+          "targetProperty": "approvalDate",
+          "condition": "Status = 'Approved'"
+        }
+      ]
+    }
+  ],
+  "relationshipMappings": [
+    {
+      "id": "player-gamesession-mapping",
+      "name": "Player to Game Session Mapping",
+      "description": "Maps the relationship between players and game sessions",
+      "type": "foreignKey",
+      "sourceEntityMapping": "player-mapping",
+      "targetEntityMapping": "game-session-mapping",
+      "targetRelationship": "PlayerToGameSession",
+      "foreignKeyTable": "GamesCasinoSessions",
+      "foreignKeySchema": "dbo",
+      "foreignKeyColumn": "PlayerID",
+      "referencedTable": "tbl_Daily_actions_players",
+      "referencedSchema": "common",
+      "referencedColumn": "PlayerID"
+    },
+    {
+      "id": "player-transaction-mapping",
+      "name": "Player to Transaction Mapping",
+      "description": "Maps the relationship between players and transactions",
+      "type": "foreignKey",
+      "sourceEntityMapping": "player-mapping",
+      "targetEntityMapping": "transaction-mapping",
+      "targetRelationship": "PlayerToTransaction",
+      "foreignKeyTable": "tbl_Daily_actions_transactions",
+      "foreignKeySchema": "common",
+      "foreignKeyColumn": "PlayerID",
+      "referencedTable": "tbl_Daily_actions_players",
+      "referencedSchema": "common",
+      "referencedColumn": "PlayerID"
+    },
+    {
+      "id": "player-bonusbalance-mapping",
+      "name": "Player to Bonus Balance Mapping",
+      "description": "Maps the relationship between players and bonus balances",
+      "type": "foreignKey",
+      "sourceEntityMapping": "player-mapping",
+      "targetEntityMapping": "bonus-balance-mapping",
+      "targetRelationship": "PlayerToBonusBalance",
+      "foreignKeyTable": "tbl_Bonus_balances",
+      "foreignKeySchema": "common",
+      "foreignKeyColumn": "PlayerID",
+      "referencedTable": "tbl_Daily_actions_players",
+      "referencedSchema": "common",
+      "referencedColumn": "PlayerID"
+    },
+    {
+      "id": "player-sportbet-mapping",
+      "name": "Player to Sport Bet Mapping",
+      "description": "Maps the relationship between players and sport bets",
+      "type": "foreignKey",
+      "sourceEntityMapping": "player-mapping",
+      "targetEntityMapping": "sport-bet-mapping",
+      "targetRelationship": "PlayerToSportBet",
+      "foreignKeyTable": "SportBetsEnhanced",
+      "foreignKeySchema": "dbo",
+      "foreignKeyColumn": "PlayerId",
+      "referencedTable": "tbl_Daily_actions_players",
+      "referencedSchema": "common",
+      "referencedColumn": "PlayerID"
+    },
+    {
+      "id": "game-bigwinner-mapping",
+      "name": "Game to Big Winner Mapping",
+      "description": "Maps the relationship between games and big winners",
+      "type": "foreignKey",
+      "sourceEntityMapping": "game-mapping",
+      "targetEntityMapping": "big-winner-mapping",
+      "targetRelationship": "GameToBigWinner",
+      "foreignKeyTable": "BigWinners",
+      "foreignKeySchema": "dbo",
+      "foreignKeyColumn": "GameID",
+      "referencedTable": "Games",
+      "referencedSchema": "dbo",
+      "referencedColumn": "GameID"
+    },
+    {
+      "id": "game-gamesession-mapping",
+      "name": "Game to Game Session Mapping",
+      "description": "Maps the relationship between games and game sessions",
+      "type": "foreignKey",
+      "sourceEntityMapping": "game-mapping",
+      "targetEntityMapping": "game-session-mapping",
+      "targetRelationship": "GameToGameSession",
+      "foreignKeyTable": "GamesCasinoSessions",
+      "foreignKeySchema": "dbo",
+      "foreignKeyColumn": "GameID",
+      "referencedTable": "Games",
+      "referencedSchema": "dbo",
+      "referencedColumn": "GameID"
+    },
+    {
+      "id": "player-bigwinner-mapping",
+      "name": "Player to Big Winner Mapping",
+      "description": "Maps the relationship between players and big winners",
+      "type": "foreignKey",
+      "sourceEntityMapping": "player-mapping",
+      "targetEntityMapping": "big-winner-mapping",
+      "targetRelationship": "PlayerToBigWinner",
+      "foreignKeyTable": "BigWinners",
+      "foreignKeySchema": "dbo",
+      "foreignKeyColumn": "PlayerID",
+      "referencedTable": "tbl_Daily_actions_players",
+      "referencedSchema": "common",
+      "referencedColumn": "PlayerID"
+    },
+    {
+      "id": "player-withdrawalrequest-mapping",
+      "name": "Player to Withdrawal Request Mapping",
+      "description": "Maps the relationship between players and withdrawal requests",
+      "type": "foreignKey",
+      "sourceEntityMapping": "player-mapping",
+      "targetEntityMapping": "withdrawal-request-mapping",
+      "targetRelationship": "PlayerToWithdrawalRequest",
+      "foreignKeyTable": "tbl_Withdrawal_requests",
+      "foreignKeySchema": "common",
+      "foreignKeyColumn": "PlayerID",
+      "referencedTable": "tbl_Daily_actions_players",
+      "referencedSchema": "common",
+      "referencedColumn": "PlayerID"
+    },
+    {
+      "id": "bonus-bonusbalance-mapping",
+      "name": "Bonus to Bonus Balance Mapping",
+      "description": "Maps the relationship between bonuses and bonus balances",
+      "type": "foreignKey",
+      "sourceEntityMapping": "bonus-mapping",
+      "targetEntityMapping": "bonus-balance-mapping",
+      "targetRelationship": "BonusToBonusBalance",
+      "foreignKeyTable": "tbl_Bonus_balances",
+      "foreignKeySchema": "common",
+      "foreignKeyColumn": "BonusID",
+      "referencedTable": "tbl_Bonuses",
+      "referencedSchema": "common",
+      "referencedColumn": "BonusID"
+    },
+    {
+      "id": "whitelabel-player-mapping",
+      "name": "White Label to Player Mapping",
+      "description": "Maps the relationship between white labels and players",
+      "type": "foreignKey",
+      "sourceEntityMapping": "white-label-mapping",
+      "targetEntityMapping": "player-mapping",
+      "targetRelationship": "WhiteLabelToPlayer",
+      "foreignKeyTable": "tbl_Daily_actions_players",
+      "foreignKeySchema": "common",
+      "foreignKeyColumn": "CasinoID",
+      "referencedTable": "tbl_White_labels",
+      "referencedSchema": "common",
+      "referencedColumn": "LabelID"
+    }
+  ],
+  "enumerationMappings": [
+    {
+      "id": "player-status-mapping",
+      "name": "Player Status Mapping",
+      "description": "Maps player status values from the database to the semantic model",
+      "type": "values",
+      "targetEnumeration": "PlayerStatus",
+      "valueMappings": [
+        {
+          "sourceValue": "Active",
+          "targetValue": "Active"
+        },
+        {
+          "sourceValue": "Suspended",
+          "targetValue": "Suspended"
+        },
+        {
+          "sourceValue": "Blocked",
+          "targetValue": "Blocked"
+        },
+        {
+          "sourceValue": "Closed",
+          "targetValue": "Closed"
+        },
+        {
+          "sourceValue": "SelfExcluded",
+          "targetValue": "SelfExcluded"
+        },
+        {
+          "sourceValue": "Pending",
+          "targetValue": "PendingVerification"
+        },
+        {
+          "sourceValue": "Dormant",
+          "targetValue": "Dormant"
+        }
+      ]
+    },
+    {
+      "id": "kyc-status-mapping",
+      "name": "KYC Status Mapping",
+      "description": "Maps KYC status values from the database to the semantic model",
+      "type": "values",
+      "targetEnumeration": "KYCStatus",
+      "valueMappings": [
+        {
+          "sourceValue": "Verified",
+          "targetValue": "Verified"
+        },
+        {
+          "sourceValue": "Pending",
+          "targetValue": "Pending"
+        },
+        {
+          "sourceValue": "Rejected",
+          "targetValue": "Rejected"
+        },
+        {
+          "sourceValue": "Not Submitted",
+          "targetValue": "NotSubmitted"
+        },
+        {
+          "sourceValue": "Partially Verified",
+          "targetValue": "PartiallyVerified"
+        },
+        {
+          "sourceValue": "Verification Required",
+          "targetValue": "VerificationRequired"
+        }
+      ]
+    },
+    {
+      "id": "game-type-mapping",
+      "name": "Game Type Mapping",
+      "description": "Maps game type values from the database to the semantic model",
+      "type": "values",
+      "targetEnumeration": "GameType",
+      "valueMappings": [
+        {
+          "sourceValue": "Slots",
+          "targetValue": "Slots"
+        },
+        {
+          "sourceValue": "Table Games",
+          "targetValue": "TableGames"
+        },
+        {
+          "sourceValue": "Live Casino",
+          "targetValue": "LiveDealer"
+        },
+        {
+          "sourceValue": "Jackpot",
+          "targetValue": "Jackpot"
+        },
+        {
+          "sourceValue": "Video Poker",
+          "targetValue": "VideoPoker"
+        },
+        {
+          "sourceValue": "Bingo",
+          "targetValue": "Bingo"
+        },
+        {
+          "sourceValue": "Scratch Cards",
+          "targetValue": "Scratch"
+        },
+        {
+          "sourceValue": "Virtual Sports",
+          "targetValue": "Virtual"
+        },
+        {
+          "sourceValue": "Other",
+          "targetValue": "Other"
+        }
+      ]
+    },
+    {
+      "id": "transaction-type-mapping",
+      "name": "Transaction Type Mapping",
+      "description": "Maps transaction type values from the database to the semantic model",
+      "type": "values",
+      "targetEnumeration": "TransactionType",
+      "valueMappings": [
+        {
+          "sourceValue": "Deposit",
+          "targetValue": "Deposit"
+        },
+        {
+          "sourceValue": "Withdrawal",
+          "targetValue": "Withdrawal"
+        },
+        {
+          "sourceValue": "Bonus",
+          "targetValue": "BonusIssue"
+        },
+        {
+          "sourceValue": "BonusRelease",
+          "targetValue": "BonusRelease"
+        },
+        {
+          "sourceValue": "Bet",
+          "targetValue": "GameBet"
+        },
+        {
+          "sourceValue": "Win",
+          "targetValue": "GameWin"
+        },
+        {
+          "sourceValue": "Adjustment",
+          "targetValue": "Adjustment"
+        },
+        {
+          "sourceValue": "Chargeback",
+          "targetValue": "Chargeback"
+        },
+        {
+          "sourceValue": "Refund",
+          "targetValue": "Refund"
+        },
+        {
+          "sourceValue": "Fee",
+          "targetValue": "Fee"
+        },
+        {
+          "sourceValue": "SportBet",
+          "targetValue": "SportBet"
+        },
+        {
+          "sourceValue": "SportWin",
+          "targetValue": "SportWin"
+        }
+      ]
+    },
+    {
+      "id": "bonus-type-mapping",
+      "name": "Bonus Type Mapping",
+      "description": "Maps bonus type values from the database to the semantic model",
+      "type": "values",
+      "targetEnumeration": "BonusType",
+      "valueMappings": [
+        {
+          "sourceValue": "Welcome",
+          "targetValue": "Welcome"
+        },
+        {
+          "sourceValue": "Deposit",
+          "targetValue": "Deposit"
+        },
+        {
+          "sourceValue": "NoDeposit",
+          "targetValue": "NoDeposit"
+        },
+        {
+          "sourceValue": "FreeSpins",
+          "targetValue": "FreeSpins"
+        },
+        {
+          "sourceValue": "Cashback",
+          "targetValue": "Cashback"
+        },
+        {
+          "sourceValue": "Reload",
+          "targetValue": "Reload"
+        },
+        {
+          "sourceValue": "Loyalty",
+          "targetValue": "Loyalty"
+        },
+        {
+          "sourceValue": "Referral",
+          "targetValue": "Referral"
+        },
+        {
+          "sourceValue": "Tournament",
+          "targetValue": "Tournament"
+        },
+        {
+          "sourceValue": "FreeBet",
+          "targetValue": "FreeBet"
+        },
+        {
+          "sourceValue": "BetInsurance",
+          "targetValue": "BetInsurance"
+        }
+      ]
+    }
+  ],
+  "transformations": [
+    {
+      "id": "mapValue",
+      "name": "Map Value",
+      "description": "Maps a source value to a target value using a lookup table",
+      "type": "lookup",
+      "parameters": [
+        {
+          "name": "mapping",
+          "type": "object",
+          "description": "Mapping of source values to target values",
+          "required": true
+        },
+        {
+          "name": "defaultValue",
+          "type": "any",
+          "description": "Default value if the source value is not found in the mapping",
+          "required": false
+        }
+      ]
+    },
+    {
+      "id": "divideBy100",
+      "name": "Divide By 100",
+      "description": "Divides a value by 100",
+      "type": "function",
+      "function": "calculate",
+      "script": "return value / 100;"
+    },
+    {
+      "id": "jsonToPreferences",
+      "name": "JSON to Preferences",
+      "description": "Converts a JSON string to an array of communication preferences",
+      "type": "script",
+      "script": "const json = JSON.parse(value); const preferences = []; for (const [key, enabled] of Object.entries(json)) { if (enabled) { preferences.push(key); } } return preferences;"
+    }
+  ],
+  "executionSettings": {
+    "batchSize": 5000,
+    "parallelism": 4,
+    "errorHandling": "log",
+    "retryCount": 3,
+    "retryDelay": 1000,
+    "logging": {
+      "level": "info",
+      "destination": "file",
+      "file": "mapping-execution.log"
+    },
+    "validation": {
+      "validateBeforeExecution": true,
+      "validateDuringExecution": true,
+      "validateAfterExecution": true
+    },
+    "execution": {
+      "transactional": true,
+      "commitSize": 1000,
+      "timeout": 3600000
+    }
+  }
+}

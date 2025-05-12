@@ -16,17 +16,22 @@ import {
   Dns as DnsIcon,
   History as HistoryIcon,
   Schema as SchemaIcon,
+  AutoAwesomeMosaic as AutoAwesomeMosaicIcon, // Or Layers as LayersIcon
 } from '@mui/icons-material';
 import { PageHeader } from '@/components';
 import { useSnackbar } from '@/hooks/useSnackbar';
 import { Link as RouterLink } from 'react-router-dom';
-import DataTransferService from '@/services/dataTransfer.service';
+import { Connection, ConnectionAccessLevel, ConnectionTestResult } from './types/Connection';
+import ConnectionService from '@/services/connection.service';
+import ConfigurationService from '@/services/configuration.service';
+import RunHistoryService from '@/services/runHistory.service';
 import ConnectionsTable from './components/ConnectionsTable';
 import ConfigurationsTable from './components/ConfigurationsTable';
 import ConnectionDialog from './components/ConnectionDialog';
 import ConfigurationDialog from './components/ConfigurationDialog';
 import RunHistoryTable from './components/RunHistoryTable';
 import RunDetailsDialog from './components/RunDetailsDialog';
+import { SemanticLayerAlignmentWizard } from '@/components/SemanticLayerAlignmentWizard'; // Added import
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -55,6 +60,34 @@ function TabPanel(props: TabPanelProps) {
   );
 }
 
+const ConnectionModel: Connection = {
+  connectionId: 0,
+  connectionName: '',
+  connectionString: '',
+  description: '',
+  server: '',
+  port: null,
+  database: '',
+  username: '',
+  password: '',
+  additionalParameters: '',
+  isActive: true,
+  isConnectionValid: null,
+  minPoolSize: 5,
+  maxPoolSize: 100,
+  timeout: 30,
+  trustServerCertificate: true,
+  encrypt: true,
+  connectionAccessLevel: ConnectionAccessLevel.ReadOnly,
+  createdBy: 'System',
+  createdOn: new Date().toISOString(),
+  lastModifiedBy: 'System',
+  lastModifiedOn: null,
+  lastTestedOn: null,
+  isSource: true,
+  isDestination: false
+};
+
 export default function DataTransferPage() {
   const [activeTab, setActiveTab] = useState(0);
   interface Configuration {
@@ -68,36 +101,6 @@ export default function DataTransferPage() {
     isActive?: boolean;
     tableMappings?: any[];
     schedules?: any[];
-  }
-
-  interface Connection {
-    connectionId: number;
-    connectionName: string;
-    connectionString: string;
-    connectionStringForDisplay?: string;
-    connectionDetails?: {
-      server?: string;
-      database?: string;
-      username?: string;
-      password?: string;
-      port?: string;
-    };
-    // Add direct username and password properties
-    username?: string;
-    password?: string;
-    description?: string;
-    isSource?: boolean;
-    isDestination?: boolean;
-    isActive: boolean;
-    connectionAccessLevel?: 'ReadOnly' | 'WriteOnly' | 'ReadWrite';
-    lastTestedOn?: string | Date | null;
-    createdOn?: string | Date;
-    lastModifiedOn?: string | Date;
-    maxPoolSize?: number;
-    minPoolSize?: number;
-    timeout?: number;
-    encrypt?: boolean;
-    trustServerCertificate?: boolean;
   }
 
   interface RunHistoryItem {
@@ -116,11 +119,13 @@ export default function DataTransferPage() {
   const [connections, setConnections] = useState<Connection[]>([]);
   const [runHistory, setRunHistory] = useState<RunHistoryItem[]>([]);
   const [selectedConfig, setSelectedConfig] = useState<Configuration | null>(null);
+  const [selectedConnection, setSelectedConnection] = useState<Connection | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isConfigDialogOpen, setIsConfigDialogOpen] = useState(false);
   const [isConnectionDialogOpen, setIsConnectionDialogOpen] = useState(false);
   const [isRunDetailsDialogOpen, setIsRunDetailsDialogOpen] = useState(false);
   const [runDetails, setRunDetails] = useState<any>(null);
+  const [isSemanticWizardOpen, setIsSemanticWizardOpen] = useState(false); // Added state for new wizard
   const { showSnackbar } = useSnackbar();
 
   useEffect(() => {
@@ -145,8 +150,7 @@ export default function DataTransferPage() {
 
   const loadConfigurations = async () => {
     try {
-      // The service now returns the configurations array directly
-      const configurationsArray = await DataTransferService.getConfigurations();
+      const configurationsArray = await ConfigurationService.getConfigurations();
       console.log('Configurations array from service:', configurationsArray);
       console.log('Configurations array length:', configurationsArray.length);
 
@@ -168,8 +172,7 @@ export default function DataTransferPage() {
 
   const loadConnections = async () => {
     try {
-      // The service now returns the connections array directly
-      const connectionsArray = await DataTransferService.getConnections();
+      const connectionsArray = await ConnectionService.getConnections();
       console.log('Connections array from service:', connectionsArray);
       console.log('Connections array length:', connectionsArray.length);
 
@@ -191,8 +194,7 @@ export default function DataTransferPage() {
 
   const loadRunHistory = async (configId: number = 0) => {
     try {
-      // The service now returns the run history array directly
-      const historyArray = await DataTransferService.getRunHistory(configId);
+      const historyArray = await RunHistoryService.getRunHistory(configId);
       console.log('Run history array from service:', historyArray);
       console.log('Run history array length:', historyArray.length);
 
@@ -214,8 +216,8 @@ export default function DataTransferPage() {
 
   const loadRunDetails = async (runId: number) => {
     try {
-      const response = await DataTransferService.getRunDetails(runId);
-      setRunDetails(response.data);
+      const response = await RunHistoryService.getRunDetails(runId);
+      setRunDetails(response);
       setIsRunDetailsDialogOpen(true);
     } catch (error) {
       console.error('Error loading run details:', error);
@@ -233,119 +235,30 @@ export default function DataTransferPage() {
   };
 
   const handleOpenConnectionDialog = (connection: Connection | null = null) => {
-    setSelectedConfig(connection as unknown as Configuration);
+    console.log('Opening connection for edit:', connection);
+    setSelectedConnection(connection);
     setIsConnectionDialogOpen(true);
   };
 
-  const handleSaveConnection = async (connectionData: Connection) => {
+  const handleSaveConnection = async (connection: Connection) => {
     try {
-      // Validate connection data before sending to the service
-      if (!connectionData.connectionName || !connectionData.connectionString) {
-        showSnackbar('Connection name and connection string are required', 'error');
-        return;
-      }
-
-      // Get the numeric value for connectionAccessLevel
-      let connectionAccessLevelValue: number;
-
-      if (connectionData.connectionAccessLevel) {
-        // Convert string enum to numeric value
-        switch (connectionData.connectionAccessLevel) {
-          case 'ReadOnly':
-            connectionAccessLevelValue = 0;
-            break;
-          case 'WriteOnly':
-            connectionAccessLevelValue = 1;
-            break;
-          case 'ReadWrite':
-            connectionAccessLevelValue = 2;
-            break;
-          default:
-            connectionAccessLevelValue = 0; // Default to ReadOnly
-        }
-      } else {
-        // Derive from isSource and isDestination
-        connectionAccessLevelValue =
-          (connectionData.isSource && connectionData.isDestination) ? 2 : // ReadWrite
-          connectionData.isSource ? 0 : // ReadOnly
-          connectionData.isDestination ? 1 : 0; // WriteOnly, default to ReadOnly
-      }
-
-      // Format the connection data correctly for the API
-      const formattedConnection = {
-        ...connectionData,
-        connectionAccessLevel: connectionAccessLevelValue,
-        // Make sure username and password are included directly
-        username: connectionData.connectionDetails?.username || connectionData.username || '',
-        password: connectionData.connectionDetails?.password || connectionData.password || '',
-        // Add required fields that were missing
-        createdBy: "System",
-        lastModifiedBy: "System",
-        createdOn: connectionData.createdOn || new Date().toISOString(),
-        lastModifiedOn: new Date().toISOString()
-      };
-
-      console.log('Saving connection with username:', formattedConnection.username);
-
-      console.log('Saving connection with data:', formattedConnection);
-
-      // Call the service to save the connection
-      const result = await DataTransferService.saveConnection(formattedConnection);
-
-      // Close the dialog and refresh the connections list
-      setIsConnectionDialogOpen(false);
+      console.log('Saving connection with data:', connection);
+      
+      // Save connection using the ConnectionService
+      const response = await ConnectionService.saveConnection(connection);
+      
+      showSnackbar('Connection saved successfully', 'success');
       await loadConnections();
-
-      // Show success message
-      showSnackbar(
-        connectionData.connectionId
-          ? `Connection "${connectionData.connectionName}" updated successfully`
-          : `Connection "${connectionData.connectionName}" created successfully`,
-        'success'
-      );
-
-      return result;
-    } catch (error: any) {
+      setIsConnectionDialogOpen(false);
+    } catch (error) {
       console.error('Error saving connection:', error);
-
-      // Check if this is a conflict error (409) with an existing connection
-      if (error.response && error.response.status === 409) {
-        const { message, existingConnectionId } = error.response.data || {};
-
-        if (existingConnectionId) {
-          // If we have the ID of the existing connection, ask if the user wants to edit it instead
-          if (window.confirm(`${message || 'A connection with this name already exists.'} Would you like to edit the existing connection instead?`)) {
-            // Find the existing connection and open it for editing
-            const existingConnection = connections.find(c => c.connectionId === existingConnectionId);
-            if (existingConnection) {
-              handleOpenConnectionDialog(existingConnection);
-              return;
-            }
-          }
-        } else {
-          // Just show the conflict message
-          showSnackbar(message || 'A connection with this name already exists', 'warning');
-        }
-      } else if (error.name === 'SaveConnectionError') {
-        // Show the specific error message from our enhanced error
-        showSnackbar(error.message, 'error');
-      } else if (error.response && error.response.data) {
-        // Show the error message from the API response if available
-        const errorMessage = error.response.data.message || error.response.data.error || 'Failed to save connection';
-        showSnackbar(errorMessage, 'error');
-      } else {
-        // Show a generic error message for other errors
-        showSnackbar(`Error saving connection: ${error.message || 'Unknown error'}`, 'error');
-      }
-
-      // Return null to indicate failure
-      return null;
+      showSnackbar('Error saving connection', 'error');
     }
   };
 
   const handleSaveConfig = async (configData: Configuration) => {
     try {
-      await DataTransferService.saveConfiguration(configData);
+      await ConfigurationService.saveConfiguration(configData);
       setIsConfigDialogOpen(false);
       await loadConfigurations();
       showSnackbar('Configuration saved successfully', 'success');
@@ -357,7 +270,7 @@ export default function DataTransferPage() {
 
   const handleExecuteTransfer = async (configId: number) => {
     try {
-      await DataTransferService.executeTransfer(configId);
+      await ConfigurationService.executeTransfer(configId);
       showSnackbar('Data transfer started successfully', 'success');
       // Reload run history after a short delay to show the new run
       setTimeout(() => loadRunHistory(configId), 1000);
@@ -370,7 +283,7 @@ export default function DataTransferPage() {
   const handleTestConfiguration = async (configId: number) => {
     try {
       setIsLoading(true);
-      const response = await DataTransferService.testConfiguration(configId);
+      const response = await ConfigurationService.testConfiguration(configId);
 
       if (response.overallSuccess) {
         showSnackbar(`All connections successful for "${response.configurationName}"`, 'success');
@@ -406,64 +319,26 @@ export default function DataTransferPage() {
     setIsRunDetailsDialogOpen(false);
   };
 
+  const handleOpenSemanticWizard = () => { // Added handler
+    setIsSemanticWizardOpen(true);
+  };
+
+  const handleCloseSemanticWizard = () => { // Added handler
+    setIsSemanticWizardOpen(false);
+  };
+
   const handleTestConnection = async (connection: Connection) => {
     try {
       setIsLoading(true);
-
-      // Get the numeric value for connectionAccessLevel
-      let connectionAccessLevelValue: number;
-
-      if (connection.connectionAccessLevel) {
-        // Convert string enum to numeric value
-        switch (connection.connectionAccessLevel) {
-          case 'ReadOnly':
-            connectionAccessLevelValue = 0;
-            break;
-          case 'WriteOnly':
-            connectionAccessLevelValue = 1;
-            break;
-          case 'ReadWrite':
-            connectionAccessLevelValue = 2;
-            break;
-          default:
-            connectionAccessLevelValue = 0; // Default to ReadOnly
-        }
-      } else {
-        // Derive from isSource and isDestination
-        connectionAccessLevelValue =
-          (connection.isSource && connection.isDestination) ? 2 : // ReadWrite
-          connection.isSource ? 0 : // ReadOnly
-          connection.isDestination ? 1 : 0; // WriteOnly, default to ReadOnly
-      }
-
-      // Format the connection data correctly for the API
-      const connectionData = {
-        connectionId: connection.connectionId,
-        connectionName: connection.connectionName,
-        connectionString: connection.connectionString,
-        description: connection.description || '',
-        connectionAccessLevel: connectionAccessLevelValue,
-        isActive: connection.isActive,
-        maxPoolSize: connection.maxPoolSize || 100,
-        minPoolSize: connection.minPoolSize || 5,
-        timeout: connection.timeout || 30,
-        encrypt: connection.encrypt !== undefined ? connection.encrypt : true,
-        trustServerCertificate: connection.trustServerCertificate !== undefined ? connection.trustServerCertificate : true,
-        // Add required fields that were missing
-        createdBy: "System",
-        lastModifiedBy: "System", // This was the missing required field
-        createdOn: connection.createdOn || new Date().toISOString(),
-        lastModifiedOn: connection.lastModifiedOn || new Date().toISOString()
-      };
-
-      console.log('Testing connection with data:', connectionData);
-      const response = await DataTransferService.testConnection(connectionData);
-
+      
+      console.log('Testing connection with data:', connection);
+      
+      const response = await ConnectionService.testConnection(connection);
+      
       if (response.success) {
-        showSnackbar(`Connection successful to ${response.database} on ${response.server}`, 'success');
+        showSnackbar('Connection test successful', 'success');
       } else {
-        showSnackbar(`Connection failed: ${response.message}`, 'error');
-        console.error('Connection test failed:', response);
+        showSnackbar(`Connection test failed: ${response.message}`, 'error');
       }
     } catch (error) {
       console.error('Error testing connection:', error);
@@ -536,6 +411,30 @@ export default function DataTransferPage() {
                       fullWidth
                     >
                       New Configuration
+                    </Button>
+                  </CardContent>
+                </Card>
+              </Grid>
+
+              {/* New Card for Semantic Layer Alignment Wizard */}
+              <Grid item xs={12} md={6} lg={4}>
+                <Card variant="outlined">
+                  <CardContent>
+                    <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                      <AutoAwesomeMosaicIcon color="primary" sx={{ mr: 1 }} />
+                      <Typography variant="h6" component="h3">
+                        Semantic Layer Alignment
+                      </Typography>
+                    </Box>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                      Align database schemas with semantic layer ontology definitions (SLOD).
+                    </Typography>
+                    <Button
+                      variant="outlined"
+                      onClick={handleOpenSemanticWizard}
+                      fullWidth
+                    >
+                      Open Alignment Wizard
                     </Button>
                   </CardContent>
                 </Card>
@@ -654,7 +553,7 @@ export default function DataTransferPage() {
       {/* Connection Dialog */}
       <ConnectionDialog
         open={isConnectionDialogOpen}
-        connection={selectedConfig}
+        connection={selectedConnection}
         onClose={() => setIsConnectionDialogOpen(false)}
         onSave={handleSaveConnection}
       />
@@ -673,6 +572,18 @@ export default function DataTransferPage() {
         open={isRunDetailsDialogOpen}
         runDetails={runDetails}
         onClose={handleCloseRunDetails}
+      />
+
+      {/* Semantic Layer Alignment Wizard Dialog */}
+      <SemanticLayerAlignmentWizard
+        open={isSemanticWizardOpen}
+        onClose={handleCloseSemanticWizard}
+        onComplete={(data) => {
+          console.log('Semantic Layer Alignment Wizard completed', data);
+          // Potentially handle completion, e.g., show a snackbar
+          showSnackbar('Semantic Layer Alignment Wizard completed successfully!', 'success');
+          handleCloseSemanticWizard();
+        }}
       />
     </Box>
   );

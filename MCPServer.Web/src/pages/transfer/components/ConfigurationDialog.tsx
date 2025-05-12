@@ -32,10 +32,33 @@ import { Add as AddIcon, Delete as DeleteIcon } from '@mui/icons-material';
 
 // Define TypeScript interfaces for our data structures
 interface Connection {
-  connectionId: string;
+  connectionId: number;
   connectionName: string;
-  isSource: boolean;
-  isDestination: boolean;
+  connectionString: string;
+  connectionAccessLevel: string;
+  description: string;
+  server: string;
+  port: number | null;
+  database: string;
+  username: string;
+  password: string;
+  additionalParameters: string;
+  isActive: boolean;
+  isConnectionValid: boolean | null;
+  minPoolSize: number | null;
+  maxPoolSize: number | null;
+  timeout: number | null;
+  trustServerCertificate: boolean | null;
+  encrypt: boolean | null;
+  createdBy: string;
+  createdOn: string;
+  lastModifiedBy: string;
+  lastModifiedOn: string | null;
+  lastTestedOn: string | null;
+  
+  // Computed properties that exist in the C# model but not in DB
+  isSource?: boolean;
+  isDestination?: boolean;
 }
 
 interface TableMapping {
@@ -64,8 +87,8 @@ interface ConfigurationData {
   configurationId: number;
   configurationName: string;
   description: string;
-  sourceConnection: { connectionId: string };
-  destinationConnection: { connectionId: string };
+  sourceConnection: { connectionId: string | number };
+  destinationConnection: { connectionId: string | number };
   batchSize: number;
   reportingFrequency: number;
   isActive: boolean;
@@ -358,7 +381,7 @@ export default function ConfigurationDialog({ open, configuration, connections, 
                         </MenuItem>
                       ))
                     :
-                    <MenuItem value="" disabled>No source connections available</MenuItem>
+                    <MenuItem key="no-source" value="" disabled>No source connections available</MenuItem>
                   }
                 </Select>
               </FormControl>
@@ -386,7 +409,7 @@ export default function ConfigurationDialog({ open, configuration, connections, 
                         </MenuItem>
                       ))
                     :
-                    <MenuItem value="" disabled>No destination connections available</MenuItem>
+                    <MenuItem key="no-dest" value="" disabled>No destination connections available</MenuItem>
                   }
                 </Select>
               </FormControl>
@@ -571,11 +594,11 @@ export default function ConfigurationDialog({ open, configuration, connections, 
                   onChange={handleScheduleChange}
                   label="Type"
                 >
-                  <MenuItem value="Once">Once</MenuItem>
-                  <MenuItem value="Daily">Daily</MenuItem>
-                  <MenuItem value="Weekly">Weekly</MenuItem>
-                  <MenuItem value="Monthly">Monthly</MenuItem>
-                  <MenuItem value="Custom">Custom</MenuItem>
+                  <MenuItem key="schedule-once" value="Once">Once</MenuItem>
+                  <MenuItem key="schedule-daily" value="Daily">Daily</MenuItem>
+                  <MenuItem key="schedule-weekly" value="Weekly">Weekly</MenuItem>
+                  <MenuItem key="schedule-monthly" value="Monthly">Monthly</MenuItem>
+                  <MenuItem key="schedule-custom" value="Custom">Custom</MenuItem>
                 </Select>
               </FormControl>
             </Grid>
@@ -615,11 +638,11 @@ export default function ConfigurationDialog({ open, configuration, connections, 
                   onChange={handleScheduleChange}
                   label="Unit"
                 >
-                  <MenuItem value="Minute">Minute</MenuItem>
-                  <MenuItem value="Hour">Hour</MenuItem>
-                  <MenuItem value="Day">Day</MenuItem>
-                  <MenuItem value="Week">Week</MenuItem>
-                  <MenuItem value="Month">Month</MenuItem>
+                  <MenuItem key="unit-minute" value="Minute">Minute</MenuItem>
+                  <MenuItem key="unit-hour" value="Hour">Hour</MenuItem>
+                  <MenuItem key="unit-day" value="Day">Day</MenuItem>
+                  <MenuItem key="unit-week" value="Week">Week</MenuItem>
+                  <MenuItem key="unit-month" value="Month">Month</MenuItem>
                 </Select>
               </FormControl>
             </Grid>

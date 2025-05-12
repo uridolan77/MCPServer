@@ -24,9 +24,6 @@ namespace MCPServer.Core.Features.Chat
 
             // Register chat services
             services.AddScoped<IChatStreamingService, MCPServer.Core.Services.ChatStreamingService>();
-#pragma warning disable CS0618 // Type or member is obsolete
-            services.AddScoped<IChatPlaygroundService, MCPServer.Core.Services.ChatPlaygroundService>();
-#pragma warning restore CS0618 // Type or member is obsolete
 
             return services;
         }

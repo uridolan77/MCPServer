@@ -13,6 +13,7 @@ import {
   Divider
 } from '@mui/material';
 
+// Update interface to match standardized Connection properties
 interface ConnectionSettingsProps {
   formData: {
     description: string;
@@ -21,8 +22,8 @@ interface ConnectionSettingsProps {
     isDestination: boolean;
     isActive: boolean;
     lastTestedOn: Date | null;
-    maxPoolSize: number;
-    minPoolSize: number;
+    maxPoolSize: number | null;
+    minPoolSize: number | null;
   };
   connectionTested: boolean;
   onFormChange: (e: React.ChangeEvent<HTMLInputElement | { name?: string; value: unknown }>) => void;
@@ -115,7 +116,7 @@ const ConnectionSettings: React.FC<ConnectionSettingsProps> = ({
             max="1000"
             step="10"
             name="maxPoolSize"
-            value={formData.maxPoolSize}
+            value={formData.maxPoolSize || 0}
             onChange={onFormChange}
             disabled={!connectionTested}
             style={{ width: '100%' }}
@@ -134,7 +135,7 @@ const ConnectionSettings: React.FC<ConnectionSettingsProps> = ({
             max="100"
             step="1"
             name="minPoolSize"
-            value={formData.minPoolSize}
+            value={formData.minPoolSize || 0}
             onChange={onFormChange}
             disabled={!connectionTested}
             style={{ width: '100%' }}

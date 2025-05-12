@@ -1,0 +1,1267 @@
+{
+  "metadata": {
+    "id": "odbd-slod-mapping-meta-schema-v1",
+    "version": "1.0.0",
+    "name": "ODBD to SLOD Mapping Meta-Schema",
+    "description": "A meta-schema defining the structure for mapping between database schemas (ODBD) and semantic ontologies (SLOD)",
+    "created": "2025-05-06T12:00:00Z",
+    "modified": "2025-05-06T12:00:00Z"
+  },
+  "entities": [
+    {
+      "name": "MappingDocument",
+      "description": "The root container for a mapping between ODBD and SLOD",
+      "properties": [
+        {
+          "name": "metadata",
+          "type": "MappingMetadata",
+          "description": "Metadata about the mapping document",
+          "required": true
+        },
+        {
+          "name": "connections",
+          "type": "array",
+          "items": {
+            "type": "Connection"
+          },
+          "description": "Connections to source and target systems",
+          "required": true
+        },
+        {
+          "name": "entityMappings",
+          "type": "array",
+          "items": {
+            "type": "EntityMapping"
+          },
+          "description": "Mappings between database tables and semantic entities",
+          "required": true
+        },
+        {
+          "name": "relationshipMappings",
+          "type": "array",
+          "items": {
+            "type": "RelationshipMapping"
+          },
+          "description": "Mappings between database relationships and semantic relationships",
+          "required": false
+        },
+        {
+          "name": "enumerationMappings",
+          "type": "array",
+          "items": {
+            "type": "EnumerationMapping"
+          },
+          "description": "Mappings between database enumeration-like structures and semantic enumerations",
+          "required": false
+        },
+        {
+          "name": "transformations",
+          "type": "array",
+          "items": {
+            "type": "Transformation"
+          },
+          "description": "Reusable transformations for mapping values",
+          "required": false
+        },
+        {
+          "name": "executionSettings",
+          "type": "ExecutionSettings",
+          "description": "Settings for executing the mapping",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "MappingMetadata",
+      "description": "Metadata about a mapping document",
+      "properties": [
+        {
+          "name": "id",
+          "type": "string",
+          "description": "Unique identifier for the mapping document",
+          "required": true,
+          "pattern": "^[a-z0-9-]+$"
+        },
+        {
+          "name": "version",
+          "type": "string",
+          "description": "Version of the mapping document",
+          "required": true,
+          "pattern": "^\\d+\\.\\d+\\.\\d+$"
+        },
+        {
+          "name": "name",
+          "type": "string",
+          "description": "Human-readable name of the mapping document",
+          "required": true
+        },
+        {
+          "name": "description",
+          "type": "string",
+          "description": "Description of the mapping document",
+          "required": true
+        },
+        {
+          "name": "created",
+          "type": "string",
+          "description": "Creation date of the mapping document",
+          "required": true,
+          "format": "datetime"
+        },
+        {
+          "name": "modified",
+          "type": "string",
+          "description": "Last modification date of the mapping document",
+          "required": true,
+          "format": "datetime"
+        },
+        {
+          "name": "authors",
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Authors of the mapping document",
+          "required": false
+        },
+        {
+          "name": "sourceSchemaId",
+          "type": "string",
+          "description": "Identifier of the source ODBD schema",
+          "required": true
+        },
+        {
+          "name": "targetOntologyId",
+          "type": "string",
+          "description": "Identifier of the target SLOD ontology",
+          "required": true
+        },
+        {
+          "name": "tags",
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Tags for the mapping document",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "Connection",
+      "description": "A connection to a source or target system",
+      "properties": [
+        {
+          "name": "id",
+          "type": "string",
+          "description": "Unique identifier for the connection",
+          "required": true
+        },
+        {
+          "name": "name",
+          "type": "string",
+          "description": "Human-readable name for the connection",
+          "required": true
+        },
+        {
+          "name": "description",
+          "type": "string",
+          "description": "Description of the connection",
+          "required": false
+        },
+        {
+          "name": "type",
+          "type": "string",
+          "description": "Type of the connection",
+          "required": true,
+          "enum": ["source", "target"]
+        },
+        {
+          "name": "system",
+          "type": "string",
+          "description": "System type for the connection",
+          "required": true,
+          "enum": ["database", "ontology", "file", "api"]
+        },
+        {
+          "name": "dialect",
+          "type": "string",
+          "description": "Dialect or specific system type",
+          "required": false,
+          "enum": ["sqlserver", "oracle", "mysql", "postgresql", "owlrdf", "json", "csv", "rest"]
+        },
+        {
+          "name": "connectionString",
+          "type": "string",
+          "description": "Connection string or URI for the connection",
+          "required": false
+        },
+        {
+          "name": "credentials",
+          "type": "object",
+          "description": "Credentials for the connection",
+          "required": false,
+          "properties": {
+            "username": {
+              "type": "string",
+              "description": "Username for the connection"
+            },
+            "password": {
+              "type": "string",
+              "description": "Password for the connection",
+              "format": "password"
+            },
+            "apiKey": {
+              "type": "string",
+              "description": "API key for the connection"
+            }
+          }
+        },
+        {
+          "name": "parameters",
+          "type": "object",
+          "description": "Additional parameters for the connection",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "EntityMapping",
+      "description": "A mapping between a database table and a semantic entity",
+      "properties": [
+        {
+          "name": "id",
+          "type": "string",
+          "description": "Unique identifier for the entity mapping",
+          "required": true
+        },
+        {
+          "name": "name",
+          "type": "string",
+          "description": "Human-readable name for the entity mapping",
+          "required": true
+        },
+        {
+          "name": "description",
+          "type": "string",
+          "description": "Description of the entity mapping",
+          "required": false
+        },
+        {
+          "name": "sourceTable",
+          "type": "string",
+          "description": "Identifier of the source database table",
+          "required": true
+        },
+        {
+          "name": "sourceSchema",
+          "type": "string",
+          "description": "Schema of the source database table",
+          "required": false
+        },
+        {
+          "name": "sourceQuery",
+          "type": "string",
+          "description": "Query to retrieve data from the source (alternative to sourceTable)",
+          "required": false
+        },
+        {
+          "name": "targetEntity",
+          "type": "string",
+          "description": "Identifier of the target semantic entity",
+          "required": true
+        },
+        {
+          "name": "condition",
+          "type": "string",
+          "description": "Condition for applying the mapping",
+          "required": false
+        },
+        {
+          "name": "filter",
+          "type": "string",
+          "description": "Filter for selecting specific rows",
+          "required": false
+        },
+        {
+          "name": "identityMapping",
+          "type": "IdentityMapping",
+          "description": "Mapping for the identity of the entity",
+          "required": true
+        },
+        {
+          "name": "propertyMappings",
+          "type": "array",
+          "items": {
+            "type": "PropertyMapping"
+          },
+          "description": "Mappings between database columns and semantic properties",
+          "required": true
+        },
+        {
+          "name": "propertyDefaultValues",
+          "type": "object",
+          "description": "Default values for properties not mapped from the source",
+          "required": false
+        },
+        {
+          "name": "joinConditions",
+          "type": "array",
+          "items": {
+            "type": "JoinCondition"
+          },
+          "description": "Join conditions for complex entity mappings",
+          "required": false
+        },
+        {
+          "name": "enabled",
+          "type": "boolean",
+          "description": "Whether the entity mapping is enabled",
+          "required": false,
+          "defaultValue": true
+        }
+      ]
+    },
+    {
+      "name": "IdentityMapping",
+      "description": "A mapping for the identity of an entity",
+      "properties": [
+        {
+          "name": "type",
+          "type": "string",
+          "description": "Type of identity mapping",
+          "required": true,
+          "enum": ["column", "composite", "template", "expression"]
+        },
+        {
+          "name": "sourceColumns",
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Source columns for the identity mapping",
+          "required": false
+        },
+        {
+          "name": "template",
+          "type": "string",
+          "description": "Template for generating the identity",
+          "required": false
+        },
+        {
+          "name": "expression",
+          "type": "string",
+          "description": "Expression for generating the identity",
+          "required": false
+        },
+        {
+          "name": "prefix",
+          "type": "string",
+          "description": "Prefix for the identity",
+          "required": false
+        },
+        {
+          "name": "suffix",
+          "type": "string",
+          "description": "Suffix for the identity",
+          "required": false
+        },
+        {
+          "name": "separator",
+          "type": "string",
+          "description": "Separator for composite identities",
+          "required": false,
+          "defaultValue": "-"
+        }
+      ]
+    },
+    {
+      "name": "PropertyMapping",
+      "description": "A mapping between a database column and a semantic property",
+      "properties": [
+        {
+          "name": "sourceColumn",
+          "type": "string",
+          "description": "Source column for the property mapping",
+          "required": false
+        },
+        {
+          "name": "sourceExpression",
+          "type": "string",
+          "description": "Expression for deriving the property value",
+          "required": false
+        },
+        {
+          "name": "targetProperty",
+          "type": "string",
+          "description": "Target semantic property",
+          "required": true
+        },
+        {
+          "name": "transformation",
+          "type": "string",
+          "description": "Transformation to apply to the value",
+          "required": false
+        },
+        {
+          "name": "transformationParameters",
+          "type": "object",
+          "description": "Parameters for the transformation",
+          "required": false
+        },
+        {
+          "name": "condition",
+          "type": "string",
+          "description": "Condition for applying the mapping",
+          "required": false
+        },
+        {
+          "name": "defaultValue",
+          "type": "any",
+          "description": "Default value if the source is null",
+          "required": false
+        },
+        {
+          "name": "dataType",
+          "type": "string",
+          "description": "Data type to convert the value to",
+          "required": false
+        },
+        {
+          "name": "format",
+          "type": "string",
+          "description": "Format for parsing or formatting the value",
+          "required": false
+        },
+        {
+          "name": "enabled",
+          "type": "boolean",
+          "description": "Whether the property mapping is enabled",
+          "required": false,
+          "defaultValue": true
+        }
+      ]
+    },
+    {
+      "name": "JoinCondition",
+      "description": "A join condition for complex entity mappings",
+      "properties": [
+        {
+          "name": "sourceTable",
+          "type": "string",
+          "description": "Source table for the join",
+          "required": true
+        },
+        {
+          "name": "sourceSchema",
+          "type": "string",
+          "description": "Schema of the source table",
+          "required": false
+        },
+        {
+          "name": "sourceColumn",
+          "type": "string",
+          "description": "Source column for the join",
+          "required": true
+        },
+        {
+          "name": "targetTable",
+          "type": "string",
+          "description": "Target table for the join",
+          "required": true
+        },
+        {
+          "name": "targetSchema",
+          "type": "string",
+          "description": "Schema of the target table",
+          "required": false
+        },
+        {
+          "name": "targetColumn",
+          "type": "string",
+          "description": "Target column for the join",
+          "required": true
+        },
+        {
+          "name": "joinType",
+          "type": "string",
+          "description": "Type of join",
+          "required": false,
+          "enum": ["inner", "left", "right", "full"],
+          "defaultValue": "inner"
+        },
+        {
+          "name": "additionalCondition",
+          "type": "string",
+          "description": "Additional condition for the join",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "RelationshipMapping",
+      "description": "A mapping between database relationships and semantic relationships",
+      "properties": [
+        {
+          "name": "id",
+          "type": "string",
+          "description": "Unique identifier for the relationship mapping",
+          "required": true
+        },
+        {
+          "name": "name",
+          "type": "string",
+          "description": "Human-readable name for the relationship mapping",
+          "required": true
+        },
+        {
+          "name": "description",
+          "type": "string",
+          "description": "Description of the relationship mapping",
+          "required": false
+        },
+        {
+          "name": "type",
+          "type": "string",
+          "description": "Type of relationship mapping",
+          "required": true,
+          "enum": ["foreignKey", "joinTable", "reference", "expression"]
+        },
+        {
+          "name": "sourceEntityMapping",
+          "type": "string",
+          "description": "Identifier of the source entity mapping",
+          "required": true
+        },
+        {
+          "name": "targetEntityMapping",
+          "type": "string",
+          "description": "Identifier of the target entity mapping",
+          "required": true
+        },
+        {
+          "name": "targetRelationship",
+          "type": "string",
+          "description": "Identifier of the target semantic relationship",
+          "required": true
+        },
+        {
+          "name": "foreignKeyTable",
+          "type": "string",
+          "description": "Table containing the foreign key",
+          "required": false
+        },
+        {
+          "name": "foreignKeySchema",
+          "type": "string",
+          "description": "Schema of the foreign key table",
+          "required": false
+        },
+        {
+          "name": "foreignKeyColumn",
+          "type": "string",
+          "description": "Column containing the foreign key",
+          "required": false
+        },
+        {
+          "name": "referencedTable",
+          "type": "string",
+          "description": "Table referenced by the foreign key",
+          "required": false
+        },
+        {
+          "name": "referencedSchema",
+          "type": "string",
+          "description": "Schema of the referenced table",
+          "required": false
+        },
+        {
+          "name": "referencedColumn",
+          "type": "string",
+          "description": "Column referenced by the foreign key",
+          "required": false
+        },
+        {
+          "name": "joinTable",
+          "type": "string",
+          "description": "Join table for many-to-many relationships",
+          "required": false
+        },
+        {
+          "name": "joinSchema",
+          "type": "string",
+          "description": "Schema of the join table",
+          "required": false
+        },
+        {
+          "name": "sourceJoinColumn",
+          "type": "string",
+          "description": "Column in the join table referencing the source",
+          "required": false
+        },
+        {
+          "name": "targetJoinColumn",
+          "type": "string",
+          "description": "Column in the join table referencing the target",
+          "required": false
+        },
+        {
+          "name": "expression",
+          "type": "string",
+          "description": "Expression for deriving the relationship",
+          "required": false
+        },
+        {
+          "name": "filter",
+          "type": "string",
+          "description": "Filter for selecting specific relationships",
+          "required": false
+        },
+        {
+          "name": "enabled",
+          "type": "boolean",
+          "description": "Whether the relationship mapping is enabled",
+          "required": false,
+          "defaultValue": true
+        }
+      ]
+    },
+    {
+      "name": "EnumerationMapping",
+      "description": "A mapping between database enumeration-like structures and semantic enumerations",
+      "properties": [
+        {
+          "name": "id",
+          "type": "string",
+          "description": "Unique identifier for the enumeration mapping",
+          "required": true
+        },
+        {
+          "name": "name",
+          "type": "string",
+          "description": "Human-readable name for the enumeration mapping",
+          "required": true
+        },
+        {
+          "name": "description",
+          "type": "string",
+          "description": "Description of the enumeration mapping",
+          "required": false
+        },
+        {
+          "name": "type",
+          "type": "string",
+          "description": "Type of enumeration mapping",
+          "required": true,
+          "enum": ["table", "values", "expression"]
+        },
+        {
+          "name": "sourceTable",
+          "type": "string",
+          "description": "Source table for the enumeration mapping",
+          "required": false
+        },
+        {
+          "name": "sourceSchema",
+          "type": "string",
+          "description": "Schema of the source table",
+          "required": false
+        },
+        {
+          "name": "valueColumn",
+          "type": "string",
+          "description": "Column containing the enumeration values",
+          "required": false
+        },
+        {
+          "name": "idColumn",
+          "type": "string",
+          "description": "Column containing the enumeration IDs",
+          "required": false
+        },
+        {
+          "name": "descriptionColumn",
+          "type": "string",
+          "description": "Column containing the enumeration descriptions",
+          "required": false
+        },
+        {
+          "name": "targetEnumeration",
+          "type": "string",
+          "description": "Identifier of the target semantic enumeration",
+          "required": true
+        },
+        {
+          "name": "valueMappings",
+          "type": "array",
+          "items": {
+            "type": "ValueMapping"
+          },
+          "description": "Mappings between source values and target enumeration values",
+          "required": false
+        },
+        {
+          "name": "expression",
+          "type": "string",
+          "description": "Expression for deriving the enumeration mapping",
+          "required": false
+        },
+        {
+          "name": "filter",
+          "type": "string",
+          "description": "Filter for selecting specific enumeration values",
+          "required": false
+        },
+        {
+          "name": "enabled",
+          "type": "boolean",
+          "description": "Whether the enumeration mapping is enabled",
+          "required": false,
+          "defaultValue": true
+        }
+      ]
+    },
+    {
+      "name": "ValueMapping",
+      "description": "A mapping between a source value and a target enumeration value",
+      "properties": [
+        {
+          "name": "sourceValue",
+          "type": "any",
+          "description": "Source value for the mapping",
+          "required": true
+        },
+        {
+          "name": "targetValue",
+          "type": "string",
+          "description": "Target enumeration value",
+          "required": true
+        },
+        {
+          "name": "condition",
+          "type": "string",
+          "description": "Condition for applying the mapping",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "Transformation",
+      "description": "A reusable transformation for mapping values",
+      "properties": [
+        {
+          "name": "id",
+          "type": "string",
+          "description": "Unique identifier for the transformation",
+          "required": true
+        },
+        {
+          "name": "name",
+          "type": "string",
+          "description": "Human-readable name for the transformation",
+          "required": true
+        },
+        {
+          "name": "description",
+          "type": "string",
+          "description": "Description of the transformation",
+          "required": false
+        },
+        {
+          "name": "type",
+          "type": "string",
+          "description": "Type of transformation",
+          "required": true,
+          "enum": ["function", "template", "lookup", "script", "mapper"]
+        },
+        {
+          "name": "function",
+          "type": "string",
+          "description": "Function to apply for the transformation",
+          "required": false,
+          "enum": ["concat", "split", "substring", "replace", "trim", "upper", "lower", "capitalize", "format", "parse", "calculate"]
+        },
+        {
+          "name": "template",
+          "type": "string",
+          "description": "Template for the transformation",
+          "required": false
+        },
+        {
+          "name": "lookupTable",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "input": {
+                "type": "any",
+                "description": "Input value for the lookup"
+              },
+              "output": {
+                "type": "any",
+                "description": "Output value for the lookup"
+              }
+            }
+          },
+          "description": "Lookup table for the transformation",
+          "required": false
+        },
+        {
+          "name": "script",
+          "type": "string",
+          "description": "Script for the transformation",
+          "required": false
+        },
+        {
+          "name": "parameters",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Name of the parameter"
+              },
+              "type": {
+                "type": "string",
+                "description": "Type of the parameter"
+              },
+              "description": {
+                "type": "string",
+                "description": "Description of the parameter"
+              },
+              "defaultValue": {
+                "type": "any",
+                "description": "Default value for the parameter"
+              },
+              "required": {
+                "type": "boolean",
+                "description": "Whether the parameter is required"
+              }
+            }
+          },
+          "description": "Parameters for the transformation",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "ExecutionSettings",
+      "description": "Settings for executing the mapping",
+      "properties": [
+        {
+          "name": "batchSize",
+          "type": "integer",
+          "description": "Batch size for processing data",
+          "required": false,
+          "defaultValue": 1000
+        },
+        {
+          "name": "parallelism",
+          "type": "integer",
+          "description": "Degree of parallelism for execution",
+          "required": false,
+          "defaultValue": 1
+        },
+        {
+          "name": "errorHandling",
+          "type": "string",
+          "description": "How to handle errors during execution",
+          "required": false,
+          "enum": ["fail", "skip", "log"],
+          "defaultValue": "fail"
+        },
+        {
+          "name": "retryCount",
+          "type": "integer",
+          "description": "Number of retries for failed operations",
+          "required": false,
+          "defaultValue": 0
+        },
+        {
+          "name": "retryDelay",
+          "type": "integer",
+          "description": "Delay between retries in milliseconds",
+          "required": false,
+          "defaultValue": 1000
+        },
+        {
+          "name": "logging",
+          "type": "object",
+          "description": "Logging settings",
+          "required": false,
+          "properties": {
+            "level": {
+              "type": "string",
+              "description": "Logging level",
+              "enum": ["debug", "info", "warning", "error"],
+              "defaultValue": "info"
+            },
+            "destination": {
+              "type": "string",
+              "description": "Logging destination",
+              "enum": ["console", "file", "database"],
+              "defaultValue": "console"
+            },
+            "file": {
+              "type": "string",
+              "description": "Log file path for file logging"
+            }
+          }
+        },
+        {
+          "name": "validation",
+          "type": "object",
+          "description": "Validation settings",
+          "required": false,
+          "properties": {
+            "validateBeforeExecution": {
+              "type": "boolean",
+              "description": "Whether to validate the mapping before execution",
+              "defaultValue": true
+            },
+            "validateDuringExecution": {
+              "type": "boolean",
+              "description": "Whether to validate data during execution",
+              "defaultValue": false
+            },
+            "validateAfterExecution": {
+              "type": "boolean",
+              "description": "Whether to validate the results after execution",
+              "defaultValue": false
+            }
+          }
+        },
+        {
+          "name": "execution",
+          "type": "object",
+          "description": "Execution settings",
+          "required": false,
+          "properties": {
+            "transactional": {
+              "type": "boolean",
+              "description": "Whether to execute in a transaction",
+              "defaultValue": false
+            },
+            "commitSize": {
+              "type": "integer",
+              "description": "Size of transaction commits",
+              "defaultValue": 1000
+            },
+            "timeout": {
+              "type": "integer",
+              "description": "Execution timeout in milliseconds",
+              "defaultValue": 0
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "enumerations": [
+    {
+      "id": "ConnectionType",
+      "label": "Connection Type",
+      "description": "Types of connections",
+      "values": [
+        {
+          "id": "source",
+          "label": "Source"
+        },
+        {
+          "id": "target",
+          "label": "Target"
+        }
+      ]
+    },
+    {
+      "id": "ConnectionSystem",
+      "label": "Connection System",
+      "description": "System types for connections",
+      "values": [
+        {
+          "id": "database",
+          "label": "Database"
+        },
+        {
+          "id": "ontology",
+          "label": "Ontology"
+        },
+        {
+          "id": "file",
+          "label": "File"
+        },
+        {
+          "id": "api",
+          "label": "API"
+        }
+      ]
+    },
+    {
+      "id": "ConnectionDialect",
+      "label": "Connection Dialect",
+      "description": "Dialects for connections",
+      "values": [
+        {
+          "id": "sqlserver",
+          "label": "SQL Server"
+        },
+        {
+          "id": "oracle",
+          "label": "Oracle"
+        },
+        {
+          "id": "mysql",
+          "label": "MySQL"
+        },
+        {
+          "id": "postgresql",
+          "label": "PostgreSQL"
+        },
+        {
+          "id": "owlrdf",
+          "label": "OWL/RDF"
+        },
+        {
+          "id": "json",
+          "label": "JSON"
+        },
+        {
+          "id": "csv",
+          "label": "CSV"
+        },
+        {
+          "id": "rest",
+          "label": "REST"
+        }
+      ]
+    },
+    {
+      "id": "IdentityMappingType",
+      "label": "Identity Mapping Type",
+      "description": "Types of identity mappings",
+      "values": [
+        {
+          "id": "column",
+          "label": "Column"
+        },
+        {
+          "id": "composite",
+          "label": "Composite"
+        },
+        {
+          "id": "template",
+          "label": "Template"
+        },
+        {
+          "id": "expression",
+          "label": "Expression"
+        }
+      ]
+    },
+    {
+      "id": "JoinType",
+      "label": "Join Type",
+      "description": "Types of joins",
+      "values": [
+        {
+          "id": "inner",
+          "label": "Inner"
+        },
+        {
+          "id": "left",
+          "label": "Left"
+        },
+        {
+          "id": "right",
+          "label": "Right"
+        },
+        {
+          "id": "full",
+          "label": "Full"
+        }
+      ]
+    },
+    {
+      "id": "RelationshipMappingType",
+      "label": "Relationship Mapping Type",
+      "description": "Types of relationship mappings",
+      "values": [
+        {
+          "id": "foreignKey",
+          "label": "Foreign Key"
+        },
+        {
+          "id": "joinTable",
+          "label": "Join Table"
+        },
+        {
+          "id": "reference",
+          "label": "Reference"
+        },
+        {
+          "id": "expression",
+          "label": "Expression"
+        }
+      ]
+    },
+    {
+      "id": "EnumerationMappingType",
+      "label": "Enumeration Mapping Type",
+      "description": "Types of enumeration mappings",
+      "values": [
+        {
+          "id": "table",
+          "label": "Table"
+        },
+        {
+          "id": "values",
+          "label": "Values"
+        },
+        {
+          "id": "expression",
+          "label": "Expression"
+        }
+      ]
+    },
+    {
+      "id": "TransformationType",
+      "label": "Transformation Type",
+      "description": "Types of transformations",
+      "values": [
+        {
+          "id": "function",
+          "label": "Function"
+        },
+        {
+          "id": "template",
+          "label": "Template"
+        },
+        {
+          "id": "lookup",
+          "label": "Lookup"
+        },
+        {
+          "id": "script",
+          "label": "Script"
+        },
+        {
+          "id": "mapper",
+          "label": "Mapper"
+        }
+      ]
+    },
+    {
+      "id": "TransformationFunction",
+      "label": "Transformation Function",
+      "description": "Functions for transformations",
+      "values": [
+        {
+          "id": "concat",
+          "label": "Concatenate"
+        },
+        {
+          "id": "split",
+          "label": "Split"
+        },
+        {
+          "id": "substring",
+          "label": "Substring"
+        },
+        {
+          "id": "replace",
+          "label": "Replace"
+        },
+        {
+          "id": "trim",
+          "label": "Trim"
+        },
+        {
+          "id": "upper",
+          "label": "Upper Case"
+        },
+        {
+          "id": "lower",
+          "label": "Lower Case"
+        },
+        {
+          "id": "capitalize",
+          "label": "Capitalize"
+        },
+        {
+          "id": "format",
+          "label": "Format"
+        },
+        {
+          "id": "parse",
+          "label": "Parse"
+        },
+        {
+          "id": "calculate",
+          "label": "Calculate"
+        }
+      ]
+    },
+    {
+      "id": "ErrorHandling",
+      "label": "Error Handling",
+      "description": "Error handling strategies",
+      "values": [
+        {
+          "id": "fail",
+          "label": "Fail"
+        },
+        {
+          "id": "skip",
+          "label": "Skip"
+        },
+        {
+          "id": "log",
+          "label": "Log"
+        }
+      ]
+    },
+    {
+      "id": "LoggingLevel",
+      "label": "Logging Level",
+      "description": "Logging levels",
+      "values": [
+        {
+          "id": "debug",
+          "label": "Debug"
+        },
+        {
+          "id": "info",
+          "label": "Info"
+        },
+        {
+          "id": "warning",
+          "label": "Warning"
+        },
+        {
+          "id": "error",
+          "label": "Error"
+        }
+      ]
+    },
+    {
+      "id": "LoggingDestination",
+      "label": "Logging Destination",
+      "description": "Logging destinations",
+      "values": [
+        {
+          "id": "console",
+          "label": "Console"
+        },
+        {
+          "id": "file",
+          "label": "File"
+        },
+        {
+          "id": "database",
+          "label": "Database"
+        }
+      ]
+    }
+  ]
+}

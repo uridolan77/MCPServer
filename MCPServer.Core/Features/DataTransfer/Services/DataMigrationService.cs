@@ -122,7 +122,7 @@ namespace MCPServer.Core.Features.DataTransfer.Services
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, $"Error migrating table {mapping.SourceTable} to {mapping.TargetTable}");
+                    _logger.LogError(ex, "Error migrating table {SourceTable} to {TargetTable}", mapping.SourceTable, mapping.TargetTable);
                     
                     if (mapping.FailOnError)
                         throw;
@@ -186,7 +186,7 @@ namespace MCPServer.Core.Features.DataTransfer.Services
 
         private async Task MigrateTableAsync(TableMapping mapping)
         {
-            _logger.LogInformation($"Starting migration for table {mapping.SourceTable} to {mapping.TargetTable}");
+            _logger.LogInformation("Starting migration for table {SourceTable} to {TargetTable}", mapping.SourceTable, mapping.TargetTable);
             _monitor.StartTableMigration(mapping.SourceTable);
 
             // Get column mappings (auto-generated if needed)
@@ -200,11 +200,11 @@ namespace MCPServer.Core.Features.DataTransfer.Services
 
             // Get the last migration timestamp or ID
             var lastValue = GetLastMigrationValue(mapping);
-            _logger.LogInformation($"Last migration value for {mapping.SourceTable}: {lastValue}");
+            _logger.LogInformation("Last migration value for {SourceTable}: {LastValue}", mapping.SourceTable, lastValue);
 
             // Create query for incremental load
             string query = BuildIncrementalQuery(mapping, lastValue);
-            _logger.LogDebug($"Query: {query}");
+            _logger.LogDebug("Query: {Query}", query);
 
             await using var sourceConnection = new SqlConnection(_sourceConnectionString);
             await sourceConnection.OpenAsync();
@@ -288,7 +288,7 @@ namespace MCPServer.Core.Features.DataTransfer.Services
                     {
                         await BulkInsertDataAsync(targetConnection, mapping, columns, batchData);
                     }
-                    _logger.LogInformation($"Processed batch of {currentBatch} rows for {mapping.TargetTable}");
+                    _logger.LogInformation("Processed batch of {Count} rows for {TargetTable}", currentBatch, mapping.TargetTable);
                     _monitor.UpdateTableProgress(mapping.SourceTable, totalRows);
                     batchData.Clear();
                     currentBatch = 0;
@@ -299,7 +299,7 @@ namespace MCPServer.Core.Features.DataTransfer.Services
             if (batchData.Count > 0 && !_isDryRun)
             {
                 await BulkInsertDataAsync(targetConnection, mapping, columns, batchData);
-                _logger.LogInformation($"Processed final batch of {currentBatch} rows for {mapping.TargetTable}");
+                _logger.LogInformation("Processed final batch of {Count} rows for {TargetTable}", currentBatch, mapping.TargetTable);
             }
 
             // Update the last migration value
@@ -313,7 +313,7 @@ namespace MCPServer.Core.Features.DataTransfer.Services
             }
 
             _monitor.EndTableMigration(mapping.SourceTable, totalRows);
-            _logger.LogInformation($"Completed migration for table {mapping.SourceTable} to {mapping.TargetTable}. Total rows: {totalRows}");
+            _logger.LogInformation("Completed migration for table {SourceTable} to {TargetTable}. Total rows: {TotalRows}", mapping.SourceTable, mapping.TargetTable, totalRows);
         }
 
         private object GetLastMigrationValue(TableMapping mapping)
@@ -472,7 +472,7 @@ namespace MCPServer.Core.Features.DataTransfer.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"Error during bulk insert to {mapping.TargetTable}");
+                _logger.LogError(ex, "Error during bulk insert to {TargetTable}", mapping.TargetTable);
                 throw;
             }
         }

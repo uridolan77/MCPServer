@@ -1,6 +1,4 @@
 using System;
-using MCPServer.Core.Services;
-using MCPServer.Core.Services.Interfaces;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace MCPServer.Core.Features.Models
@@ -22,8 +20,8 @@ namespace MCPServer.Core.Features.Models
                 throw new ArgumentNullException(nameof(services));
             }
 
-            // Register model services
-            services.AddScoped<IModelService, MCPServer.Core.Services.ModelService>();
+            // Note: ModelService has been removed as part of cleanup
+            // Add replacement model service registrations here if needed
 
             return services;
         }

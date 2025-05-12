@@ -1,3 +1,4 @@
+import { Connection } from '../pages/transfer/types/Connection';
 import api from './api';
 
 /**
@@ -62,61 +63,66 @@ class DataTransferService {
   // Database connections
   static async getConnections() {
     try {
-      const response = await api.get('/data-transfer/connections');
+      const response = await api.get('/datatransfer/connections');
 
       // Extract data from nested $values
       const connections = extractFromNestedValues(response.data);
+      
+      console.log('Raw connections from API:', connections);
 
-      // Process each connection to ensure proper casing of property names
+      // Process each connection to match our standardized Connection interface
       const processedConnections = Array.isArray(connections) ? connections.map(conn => {
         if (!conn) return null;
 
-        // Create a new object with camelCase property names
-        const processedConn: any = {};
+        console.log('Processing connection:', conn);
 
-        // Map each property with proper casing
-        if (conn.ConnectionId !== undefined) processedConn.connectionId = conn.ConnectionId;
-        else if (conn.connectionId !== undefined) processedConn.connectionId = conn.connectionId;
-
-        if (conn.ConnectionName !== undefined) processedConn.connectionName = conn.ConnectionName;
-        else if (conn.connectionName !== undefined) processedConn.connectionName = conn.connectionName;
-
-        if (conn.ConnectionString !== undefined) processedConn.connectionString = conn.ConnectionString;
-        else if (conn.connectionString !== undefined) processedConn.connectionString = conn.connectionString;
-
-        if (conn.Description !== undefined) processedConn.description = conn.Description;
-        else if (conn.description !== undefined) processedConn.description = conn.description;
-
-        if (conn.IsActive !== undefined) processedConn.isActive = conn.IsActive;
-        else if (conn.isActive !== undefined) processedConn.isActive = conn.isActive;
-
-        if (conn.ConnectionAccessLevel !== undefined) processedConn.connectionAccessLevel = conn.ConnectionAccessLevel;
-        else if (conn.connectionAccessLevel !== undefined) processedConn.connectionAccessLevel = conn.connectionAccessLevel;
-
-        if (conn.LastTestedOn !== undefined) processedConn.lastTestedOn = conn.LastTestedOn;
-        else if (conn.lastTestedOn !== undefined) processedConn.lastTestedOn = conn.lastTestedOn;
-
-        if (conn.CreatedOn !== undefined) processedConn.createdOn = conn.CreatedOn;
-        else if (conn.createdOn !== undefined) processedConn.createdOn = conn.createdOn;
-
-        if (conn.LastModifiedOn !== undefined) processedConn.lastModifiedOn = conn.LastModifiedOn;
-        else if (conn.lastModifiedOn !== undefined) processedConn.lastModifiedOn = conn.lastModifiedOn;
-
-        if (conn.MaxPoolSize !== undefined) processedConn.maxPoolSize = conn.MaxPoolSize;
-        else if (conn.maxPoolSize !== undefined) processedConn.maxPoolSize = conn.maxPoolSize;
-
-        if (conn.MinPoolSize !== undefined) processedConn.minPoolSize = conn.MinPoolSize;
-        else if (conn.minPoolSize !== undefined) processedConn.minPoolSize = conn.minPoolSize;
-
-        // Copy any other properties that might exist
-        for (const key in conn) {
-          if (!processedConn.hasOwnProperty(key.charAt(0).toLowerCase() + key.slice(1))) {
-            const camelCaseKey = key.charAt(0).toLowerCase() + key.slice(1);
-            processedConn[camelCaseKey] = conn[key];
-          }
-        }
-
-        return processedConn;
+        // Create a standardized Connection object that matches our database model exactly
+        return {
+          connectionId: conn.ConnectionId || conn.connectionId || conn.id || 0,
+          connectionName: conn.ConnectionName || conn.connectionName || conn.name || '',
+          connectionString: conn.ConnectionString || conn.connectionString || '',
+          description: conn.Description || conn.description || '',
+          isActive: conn.IsActive !== undefined ? conn.IsActive : 
+                  (conn.isActive !== undefined ? conn.isActive : true),
+          
+          // Database connection details
+          server: conn.Server || conn.server || '',
+          port: conn.Port || conn.port || null,
+          database: conn.Database || conn.database || '',
+          username: conn.Username || conn.username || '',
+          password: conn.Password || conn.password || '',
+          additionalParameters: conn.AdditionalParameters || conn.additionalParameters || '',
+          
+          // Connection settings
+          isConnectionValid: conn.IsConnectionValid || conn.isConnectionValid || false,
+          minPoolSize: conn.MinPoolSize || conn.minPoolSize || null,
+          maxPoolSize: conn.MaxPoolSize || conn.maxPoolSize || null,
+          timeout: conn.Timeout || conn.timeout || null,
+          trustServerCertificate: conn.TrustServerCertificate !== undefined ? conn.TrustServerCertificate :
+                                (conn.trustServerCertificate !== undefined ? conn.trustServerCertificate : true),
+          encrypt: conn.Encrypt !== undefined ? conn.Encrypt : 
+                 (conn.encrypt !== undefined ? conn.encrypt : true),
+          
+          // Metadata
+          createdBy: conn.CreatedBy || conn.createdBy || 'System',
+          createdOn: conn.CreatedOn || conn.createdOn || null,
+          lastModifiedBy: conn.LastModifiedBy || conn.lastModifiedBy || 'System',
+          lastModifiedOn: conn.LastModifiedOn || conn.lastModifiedOn || null,
+          lastTestedOn: conn.LastTestedOn || conn.lastTestedOn || null,
+          
+          // Access control
+          connectionAccessLevel: conn.ConnectionAccessLevel || conn.connectionAccessLevel || 'ReadOnly',
+          
+          // Computed properties based on connectionAccessLevel
+          isSource: conn.IsSource !== undefined ? conn.IsSource :
+                  (conn.isSource !== undefined ? conn.isSource : 
+                   (conn.ConnectionAccessLevel === 'ReadOnly' || conn.ConnectionAccessLevel === 'ReadWrite' || 
+                    conn.connectionAccessLevel === 'ReadOnly' || conn.connectionAccessLevel === 'ReadWrite')),
+          isDestination: conn.IsDestination !== undefined ? conn.IsDestination :
+                       (conn.isDestination !== undefined ? conn.isDestination : 
+                        (conn.ConnectionAccessLevel === 'WriteOnly' || conn.ConnectionAccessLevel === 'ReadWrite' || 
+                         conn.connectionAccessLevel === 'WriteOnly' || conn.connectionAccessLevel === 'ReadWrite'))
+        };
       }).filter(Boolean) : []; // Remove any null entries
 
       return processedConnections;
@@ -128,21 +134,71 @@ class DataTransferService {
 
   static async getConnection(id: number) {
     try {
-      const response = await api.get(`/data-transfer/connections/${id}`);
-      return extractFromNestedValues(response.data);
+      const response = await api.get(`/datatransfer/connections/${id}?edit=true`);
+      const connectionData = extractFromNestedValues(response.data);
+      
+      console.log('Raw connection data from API:', connectionData);
+      
+      // Create a standardized Connection object that matches our database model exactly
+      return {
+        connectionId: connectionData.ConnectionId || connectionData.connectionId || connectionData.id || 0,
+        connectionName: connectionData.ConnectionName || connectionData.connectionName || connectionData.name || '',
+        connectionString: connectionData.ConnectionString || connectionData.connectionString || '',
+        description: connectionData.Description || connectionData.description || '',
+        isActive: connectionData.IsActive !== undefined ? connectionData.IsActive : 
+                (connectionData.isActive !== undefined ? connectionData.isActive : true),
+        
+        // Database connection details
+        server: connectionData.Server || connectionData.server || '',
+        port: connectionData.Port || connectionData.port || null,
+        database: connectionData.Database || connectionData.database || '',
+        username: connectionData.Username || connectionData.username || '',
+        password: connectionData.Password || connectionData.password || '',
+        additionalParameters: connectionData.AdditionalParameters || connectionData.additionalParameters || '',
+        
+        // Connection settings
+        isConnectionValid: connectionData.IsConnectionValid || connectionData.isConnectionValid || false,
+        minPoolSize: connectionData.MinPoolSize || connectionData.minPoolSize || null,
+        maxPoolSize: connectionData.MaxPoolSize || connectionData.maxPoolSize || null,
+        timeout: connectionData.Timeout || connectionData.timeout || null,
+        trustServerCertificate: connectionData.TrustServerCertificate !== undefined ? connectionData.TrustServerCertificate :
+                              (connectionData.trustServerCertificate !== undefined ? connectionData.trustServerCertificate : true),
+        encrypt: connectionData.Encrypt !== undefined ? connectionData.Encrypt : 
+               (connectionData.encrypt !== undefined ? connectionData.encrypt : true),
+        
+        // Metadata
+        createdBy: connectionData.CreatedBy || connectionData.createdBy || 'System',
+        createdOn: connectionData.CreatedOn || connectionData.createdOn || null,
+        lastModifiedBy: connectionData.LastModifiedBy || connectionData.lastModifiedBy || 'System',
+        lastModifiedOn: connectionData.LastModifiedOn || connectionData.lastModifiedOn || null,
+        lastTestedOn: connectionData.LastTestedOn || connectionData.lastTestedOn || null,
+        
+        // Access control
+        connectionAccessLevel: connectionData.ConnectionAccessLevel || connectionData.connectionAccessLevel || 'ReadOnly',
+        
+        // Computed properties based on connectionAccessLevel
+        isSource: connectionData.IsSource !== undefined ? connectionData.IsSource :
+                (connectionData.isSource !== undefined ? connectionData.isSource : 
+                 (connectionData.ConnectionAccessLevel === 'ReadOnly' || connectionData.ConnectionAccessLevel === 'ReadWrite' || 
+                  connectionData.connectionAccessLevel === 'ReadOnly' || connectionData.connectionAccessLevel === 'ReadWrite')),
+        isDestination: connectionData.IsDestination !== undefined ? connectionData.IsDestination :
+                     (connectionData.isDestination !== undefined ? connectionData.isDestination : 
+                      (connectionData.ConnectionAccessLevel === 'WriteOnly' || connectionData.ConnectionAccessLevel === 'ReadWrite' || 
+                       connectionData.connectionAccessLevel === 'WriteOnly' || connectionData.connectionAccessLevel === 'ReadWrite'))
+      };
     } catch (error) {
       console.error('Error in getConnection:', error);
       throw error;
     }
   }
 
-  static async saveConnection(connection: any) {
+  static async saveConnection(connection: Connection) {
     try {
       // Just log the connection data for debugging
       console.log('Saving connection with data:', connection);
 
       // Both create and update use the same POST endpoint
-      const response = await api.post('/data-transfer/connections', connection);
+      const response = await api.post('/datatransfer/connections', connection);
       return response.data;
     } catch (error: any) {
       console.error('Error saving connection:', error);
@@ -150,12 +206,12 @@ class DataTransferService {
     }
   }
 
-  static async testConnection(connection: any) {
+  static async testConnection(connection: Connection) {
     try {
       // Just log the connection data for debugging
       console.log('Testing connection with data:', connection);
 
-      const response = await api.post('/data-transfer/connections/test', connection);
+      const response = await api.post('/datatransfer/connections/test', connection);
       return response.data;
     } catch (error: any) {
       if (error.response && error.response.data) {
@@ -175,9 +231,14 @@ class DataTransferService {
   // Database schema operations
   static async getDatabaseSchema(connectionId: number) {
     try {
-      // const response = await api.get(`/data-transfer/schema/${connectionId}`);
-      // Updated to GET and new endpoint
-      const response = await api.get(`/data-transfer/Schema/databases?connectionId=${connectionId}`);
+      // Ensure connectionId is valid
+      if (!connectionId || connectionId <= 0) {
+        console.error('Invalid connectionId provided:', connectionId);
+        throw new Error('Connection ID is required and must be valid');
+      }
+      
+      console.log('Fetching database schema with connectionId:', connectionId);
+      const response = await api.get(`/datatransfer/schema/databases?connectionId=${connectionId}`);
       return extractFromNestedValues(response.data);
     } catch (error) {
       console.error('Error in getDatabaseSchema:', error);
@@ -187,7 +248,7 @@ class DataTransferService {
 
   static async getDatabaseSchemaByConnectionString(connectionString: string) {
     try {
-      const response = await api.post('/data-transfer/schema', { connectionString });
+      const response = await api.post('/datatransfer/schema', { connectionString });
       return extractFromNestedValues(response.data);
     } catch (error) {
       console.error('Error in getDatabaseSchemaByConnectionString:', error);
@@ -235,7 +296,7 @@ class DataTransferService {
       }
       
       // Send the request to the API
-      const response = await api.post('/data-transfer/connections/schema', payload, {
+      const response = await api.post('/datatransfer/connections/schema', payload, {
         timeout: 60000 // Increase timeout to 60 seconds for schema retrieval
       });
       
@@ -259,7 +320,7 @@ class DataTransferService {
   // Configuration operations
   static async getConfigurations() {
     try {
-      const response = await api.get('/data-transfer/configurations');
+      const response = await api.get('/datatransfer/configurations');
 
       // Extract data from nested $values
       const configurations = extractFromNestedValues(response.data);
@@ -352,7 +413,7 @@ class DataTransferService {
 
   static async getConfiguration(id: number) {
     try {
-      const response = await api.get(`/data-transfer/configurations/${id}`);
+      const response = await api.get(`/datatransfer/configurations/${id}`);
       return extractFromNestedValues(response.data);
     } catch (error) {
       console.error('Error in getConfiguration:', error);
@@ -363,27 +424,27 @@ class DataTransferService {
   static async saveConfiguration(configuration: any) {
     if (configuration.configurationId) {
       // Update existing configuration
-      const response = await api.put(`/data-transfer/configurations/${configuration.configurationId}`, configuration);
+      const response = await api.put(`/datatransfer/configurations/${configuration.configurationId}`, configuration);
       return response.data;
     } else {
       // Create new configuration
-      const response = await api.post('/data-transfer/configurations', configuration);
+      const response = await api.post('/datatransfer/configurations', configuration);
       return response.data;
     }
   }
 
   static async deleteConfiguration(id: number) {
-    const response = await api.delete(`/data-transfer/configurations/${id}`);
+    const response = await api.delete(`/datatransfer/configurations/${id}`);
     return response.data;
   }
 
   static async testConfiguration(id: number) {
-    const response = await api.post(`/data-transfer/configurations/${id}/test`);
+    const response = await api.post(`/datatransfer/configurations/${id}/test`);
     return response.data;
   }
 
   static async executeTransfer(id: number) {
-    const response = await api.post(`/data-transfer/configurations/${id}/execute`);
+    const response = await api.post(`/datatransfer/configurations/${id}/execute`);
     return response.data;
   }
 
@@ -391,8 +452,8 @@ class DataTransferService {
   static async getRunHistory(configurationId: number = 0) {
     try {
       const url = configurationId
-        ? `/data-transfer/history?configurationId=${configurationId}`
-        : '/data-transfer/history';
+        ? `/datatransfer/runs?configurationId=${configurationId}`
+        : '/datatransfer/runs';
 
       const response = await api.get(url);
 
@@ -454,7 +515,7 @@ class DataTransferService {
 
   static async getRunDetails(runId: number) {
     try {
-      const response = await api.get(`/data-transfer/history/${runId}`);
+      const response = await api.get(`/datatransfer/runs/${runId}`);
       return extractFromNestedValues(response.data);
     } catch (error) {
       console.error('Error in getRunDetails:', error);
@@ -464,13 +525,13 @@ class DataTransferService {
 
   // Schema operations
   static async saveSchema(schema: any) {
-    const response = await api.post('/data-transfer/schema/save', schema);
+    const response = await api.post('/datatransfer/schema/save', schema);
     return response.data;
   }
 
   static async getSchemas() {
     try {
-      const response = await api.get('/data-transfer/schemas');
+      const response = await api.get('/datatransfer/schemas');
       return extractFromNestedValues(response.data);
     } catch (error) {
       console.error('Error in getSchemas:', error);
@@ -480,14 +541,7 @@ class DataTransferService {
 
   static async getSchema(id: number) { // This 'id' seems to be a configuration ID not a connection ID
     try {
-      // This likely refers to a saved configuration, not directly a database schema by connection ID.
-      // If it's meant to get schema for a connection ID, it should be getDatabaseSchema(id)
-      const response = await api.get(`/data-transfer/configurations/${id}`);
-      // Assuming the configuration might contain connection details to then fetch the schema,
-      // or this method is misnamed/misused in the original context.
-      // For now, keeping it as fetching configuration, as the path suggests.
-      // If it was intended to fetch schema by a direct ID that's not a connectionId,
-      // the backend doesn't seem to support that directly via an ID like '14' for a schema.
+      const response = await api.get(`/datatransfer/configurations/${id}`);
       return extractFromNestedValues(response.data);
     } catch (error) {
       console.error('Error in getSchema:', error);

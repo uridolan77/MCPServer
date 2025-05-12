@@ -1,7 +1,5 @@
 import React from 'react';
-import {
-  TextField
-} from '@mui/material';
+import { TextField, Grid, Typography } from '@mui/material';
 
 interface ConnectionStringFormProps {
   connectionString: string;
@@ -14,27 +12,31 @@ const ConnectionStringForm: React.FC<ConnectionStringFormProps> = ({
   connectionType,
   onChange
 }) => {
-  const getHelperText = () => {
-    if (connectionType === 'sqlServer') {
-      return "Example: Server=myserver;Database=mydatabase;User ID=myuser;Password=mypassword;";
-    } else if (connectionType === 'mysql') {
-      return "Example: Server=myserver;Database=mydatabase;User ID=myuser;Password=mypassword;Port=3306;";
-    }
-    return "Enter connection string for your database";
-  };
-
   return (
-    <TextField
-      label="Connection String"
-      name="connectionString"
-      value={connectionString}
-      onChange={onChange}
-      fullWidth
-      required
-      multiline
-      rows={3}
-      helperText={getHelperText()}
-    />
+    <Grid container spacing={3}>
+      <Grid item xs={12}>
+        <Typography variant="h6">Connection String</Typography>
+      </Grid>
+      
+      <Grid item xs={12}>
+        <TextField
+          fullWidth
+          required
+          multiline
+          rows={4}
+          label="Connection String"
+          name="connectionString"
+          value={connectionString}
+          onChange={onChange}
+          variant="outlined"
+          placeholder={
+            connectionType === 'sqlServer' 
+              ? "Server=localhost;Database=mydb;User ID=username;Password=password;" 
+              : "Server=localhost;Port=3306;Database=mydb;User ID=username;Password=password;"
+          }
+        />
+      </Grid>
+    </Grid>
   );
 };
 

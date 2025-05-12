@@ -1,24 +1,27 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
-  Grid,
   TextField,
+  Grid,
+  Typography,
+  MenuItem,
+  FormControl,
+  InputLabel,
+  Select,
   FormControlLabel,
-  Switch
+  Switch,
+  InputAdornment,
+  IconButton
 } from '@mui/material';
+import VisibilityIcon from '@mui/icons-material/Visibility';
+import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
+import { Connection } from '../types/Connection';
 
 interface ConnectionDetailsFormProps {
-  connectionDetails: {
-    server: string;
-    database: string;
-    username: string;
-    password: string;
-    port?: string;
-    additionalParams?: string;
-  };
+  connectionDetails: Connection;
   formSettings: {
-    timeout: number;
-    encrypt: boolean;
-    trustServerCertificate: boolean;
+    timeout: number | null;
+    encrypt: boolean | null;
+    trustServerCertificate: boolean | null;
   };
   onDetailsChange: (e: React.ChangeEvent<HTMLInputElement | { name?: string; value: unknown }>) => void;
   onSettingChange: (e: React.ChangeEvent<HTMLInputElement | { name?: string; value: unknown }>) => void;
@@ -30,131 +33,147 @@ const ConnectionDetailsForm: React.FC<ConnectionDetailsFormProps> = ({
   onDetailsChange,
   onSettingChange
 }) => {
+  // State for showing/hiding the password
+  const [showPassword, setShowPassword] = useState(false);
+
+  // Toggle visibility of password
+  const togglePasswordVisibility = () => {
+    setShowPassword(!showPassword);
+  };
+
   return (
-    <Grid container spacing={2}>
-      <Grid item xs={12} md={6}>
+    <Grid container spacing={3}>
+      <Grid item xs={12}>
+        <Typography variant="h6">Connection Details</Typography>
+      </Grid>
+      
+      <Grid item xs={8} md={4}>
         <TextField
+          fullWidth
+          required
           label="Server"
           name="server"
-          value={connectionDetails.server}
+          value={connectionDetails.server || ''}
           onChange={onDetailsChange}
-          fullWidth
-          required
+          variant="outlined"
+          placeholder="localhost or server.domain.com"
         />
       </Grid>
+      
+      <Grid item xs={4} md={2}>
+        <TextField
+          fullWidth
+          label="Port"
+          name="port"
+          value={connectionDetails.port || ''}
+          onChange={onDetailsChange}
+          variant="outlined"
+          type="number"
+          placeholder="1433"
+        />
+      </Grid>
+      
       <Grid item xs={12} md={6}>
         <TextField
+          fullWidth
+          required
           label="Database"
           name="database"
-          value={connectionDetails.database}
+          value={connectionDetails.database || ''}
           onChange={onDetailsChange}
+          variant="outlined"
+        />
+      </Grid>
+      
+      <Grid item xs={12} md={6}>
+        <TextField
           fullWidth
           required
-        />
-      </Grid>
-      <Grid item xs={12} md={6}>
-        <div style={{ width: '100%', marginBottom: '8px' }}>
-          <label style={{ display: 'block', marginBottom: '4px' }}>Username *</label>
-          <div
-            contentEditable
-            suppressContentEditableWarning
-            onInput={(e) => {
-              const value = e.currentTarget.textContent || '';
-              onDetailsChange({
-                target: { name: 'username', value }
-              } as React.ChangeEvent<HTMLInputElement>);
-            }}
-            style={{
-              width: '100%',
-              padding: '10px',
-              border: '1px solid #ccc',
-              borderRadius: '4px',
-              fontFamily: 'monospace',
-              minHeight: '20px'
-            }}
-          >
-            {connectionDetails.username}
-          </div>
-        </div>
-      </Grid>
-      <Grid item xs={12} md={6}>
-        <div style={{ width: '100%', marginBottom: '8px' }}>
-          <label style={{ display: 'block', marginBottom: '4px' }}>Password *</label>
-          <div
-            contentEditable
-            suppressContentEditableWarning
-            onInput={(e) => {
-              const value = e.currentTarget.textContent || '';
-              onDetailsChange({
-                target: { name: 'password', value }
-              } as React.ChangeEvent<HTMLInputElement>);
-            }}
-            style={{
-              width: '100%',
-              padding: '10px',
-              border: '1px solid #ccc',
-              borderRadius: '4px',
-              fontFamily: 'monospace',
-              minHeight: '20px'
-            }}
-          >
-            {connectionDetails.password}
-          </div>
-        </div>
-      </Grid>
-      <Grid item xs={12} md={6}>
-        <TextField
-          label="Port (Optional)"
-          name="port"
-          value={connectionDetails.port}
+          label="Username"
+          name="username"
+          value={connectionDetails.username || ''}
           onChange={onDetailsChange}
-          fullWidth
+          variant="outlined"
         />
       </Grid>
+      
       <Grid item xs={12} md={6}>
         <TextField
-          label="Connection Timeout (seconds)"
+          fullWidth
+          required
+          label="Password"
+          name="password"
+          type={showPassword ? 'text' : 'password'}
+          value={connectionDetails.password || ''}
+          onChange={onDetailsChange}
+          variant="outlined"
+          InputProps={{
+            endAdornment: (
+              <InputAdornment position="end">
+                <IconButton
+                  onClick={togglePasswordVisibility}
+                  edge="end"
+                >
+                  {showPassword ? <VisibilityOffIcon /> : <VisibilityIcon />}
+                </IconButton>
+              </InputAdornment>
+            ),
+          }}
+        />
+      </Grid>
+      
+      <Grid item xs={12}>
+        <TextField
+          fullWidth
+          label="Additional Parameters"
+          name="additionalParameters"
+          value={connectionDetails.additionalParameters || ''}
+          onChange={onDetailsChange}
+          variant="outlined"
+          placeholder="Param1=Value1;Param2=Value2"
+        />
+      </Grid>
+      
+      <Grid item xs={12} md={4}>
+        <TextField
+          fullWidth
+          label="Connection Timeout"
           name="timeout"
           type="number"
-          value={formSettings.timeout}
+          value={formSettings.timeout || 30}
           onChange={onSettingChange}
-          fullWidth
+          variant="outlined"
+          InputProps={{
+            endAdornment: <InputAdornment position="end">seconds</InputAdornment>,
+          }}
         />
       </Grid>
-      <Grid item xs={12} md={6}>
+      
+      <Grid item xs={12} md={4}>
         <FormControlLabel
           control={
             <Switch
-              name="encrypt"
-              checked={formSettings.encrypt}
+              checked={!!formSettings.encrypt}
               onChange={onSettingChange}
+              name="encrypt"
+              color="primary"
             />
           }
           label="Encrypt Connection"
         />
       </Grid>
-      <Grid item xs={12} md={6}>
+      
+      <Grid item xs={12} md={4}>
         <FormControlLabel
           control={
             <Switch
-              name="trustServerCertificate"
-              checked={formSettings.trustServerCertificate}
+              checked={!!formSettings.trustServerCertificate}
               onChange={onSettingChange}
+              name="trustServerCertificate"
+              color="primary"
             />
           }
           label="Trust Server Certificate"
-        />
-      </Grid>
-      <Grid item xs={12}>
-        <TextField
-          label="Additional Parameters (Optional)"
-          name="additionalParams"
-          value={connectionDetails.additionalParams}
-          onChange={onDetailsChange}
-          fullWidth
-          multiline
-          rows={2}
-          helperText="Additional connection string parameters (e.g. MultipleActiveResultSets=true;)"
         />
       </Grid>
     </Grid>

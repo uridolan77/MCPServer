@@ -1,0 +1,2117 @@
+{
+  "metadata": {
+    "id": "gaming-industry-slod-v1",
+    "version": "1.0.0",
+    "name": "Gaming Industry Semantic Layer",
+    "description": "Comprehensive semantic ontology for the gaming industry covering players, games, bets, transactions, and regulatory compliance",
+    "domain": "Gaming",
+    "created": "2025-05-06T12:00:00Z",
+    "modified": "2025-05-06T12:00:00Z",
+    "authors": ["ProgressPlay Data Team"],
+    "license": "Proprietary"
+  },
+  "namespaces": {
+    "gaming": "http://semantics.gaming/ontology#",
+    "schema": "http://schema.org/",
+    "skos": "http://www.w3.org/2004/02/skos/core#",
+    "xsd": "http://www.w3.org/2001/XMLSchema#",
+    "foaf": "http://xmlns.com/foaf/0.1/"
+  },
+  "entities": [
+    {
+      "id": "Player",
+      "label": "Player",
+      "description": "A registered user who participates in gaming activities",
+      "subClassOf": "foaf:Person",
+      "properties": [
+        {
+          "id": "playerID",
+          "label": "Player ID",
+          "description": "The unique identifier for the player",
+          "range": "xsd:long",
+          "required": true,
+          "functionalProperty": true
+        },
+        {
+          "id": "alias",
+          "label": "Alias",
+          "description": "The player's username or nickname",
+          "range": "xsd:string",
+          "required": true,
+          "functionalProperty": true
+        },
+        {
+          "id": "registrationDate",
+          "label": "Registration Date",
+          "description": "The date when the player registered",
+          "range": "xsd:dateTime",
+          "required": true,
+          "functionalProperty": true
+        },
+        {
+          "id": "firstDepositDate",
+          "label": "First Deposit Date",
+          "description": "The date of the player's first deposit",
+          "range": "xsd:dateTime",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "lastLoginDate",
+          "label": "Last Login Date",
+          "description": "The date of the player's last login",
+          "range": "xsd:dateTime",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "dateOfBirth",
+          "label": "Date of Birth",
+          "description": "The player's date of birth",
+          "range": "xsd:date",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "gender",
+          "label": "Gender",
+          "description": "The player's gender",
+          "range": "xsd:string",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "country",
+          "label": "Country",
+          "description": "The player's country of residence",
+          "range": "Country",
+          "required": true,
+          "functionalProperty": true
+        },
+        {
+          "id": "currency",
+          "label": "Currency",
+          "description": "The player's preferred currency",
+          "range": "Currency",
+          "required": true,
+          "functionalProperty": true
+        },
+        {
+          "id": "balance",
+          "label": "Balance",
+          "description": "The player's current balance",
+          "range": "xsd:decimal",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "accountBalance",
+          "label": "Account Balance",
+          "description": "The player's real money account balance",
+          "range": "xsd:decimal",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "bonusBalance",
+          "label": "Bonus Balance",
+          "description": "The player's bonus balance",
+          "range": "xsd:decimal",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "affiliateID",
+          "label": "Affiliate ID",
+          "description": "The identifier of the affiliate who referred the player",
+          "range": "xsd:string",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "language",
+          "label": "Language",
+          "description": "The player's preferred language",
+          "range": "xsd:string",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "registeredPlatform",
+          "label": "Registered Platform",
+          "description": "The platform on which the player registered",
+          "range": "xsd:string",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "email",
+          "label": "Email",
+          "description": "The player's email address",
+          "range": "xsd:string",
+          "required": true,
+          "functionalProperty": true
+        },
+        {
+          "id": "isOptIn",
+          "label": "Is Opt-In",
+          "description": "Whether the player has opted in to communications",
+          "range": "xsd:boolean",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "isBlocked",
+          "label": "Is Blocked",
+          "description": "Whether the player is blocked from playing",
+          "range": "xsd:boolean",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "isTest",
+          "label": "Is Test",
+          "description": "Whether the player is a test account",
+          "range": "xsd:boolean",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "vipLevel",
+          "label": "VIP Level",
+          "description": "The player's VIP or loyalty level",
+          "range": "xsd:string",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "totalDeposits",
+          "label": "Total Deposits",
+          "description": "The total amount deposited by the player",
+          "range": "xsd:decimal",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "totalWithdrawals",
+          "label": "Total Withdrawals",
+          "description": "The total amount withdrawn by the player",
+          "range": "xsd:decimal",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "firstName",
+          "label": "First Name",
+          "description": "The player's first name",
+          "range": "xsd:string",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "lastName",
+          "label": "Last Name",
+          "description": "The player's last name",
+          "range": "xsd:string",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "customerClubPoints",
+          "label": "Customer Club Points",
+          "description": "The player's accumulated loyalty points",
+          "range": "xsd:decimal",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "wagered",
+          "label": "Wagered",
+          "description": "The total amount wagered by the player",
+          "range": "xsd:decimal",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "casinoID",
+          "label": "Casino ID",
+          "description": "The identifier of the casino or white label",
+          "range": "xsd:integer",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "revenueEUR",
+          "label": "Revenue EUR",
+          "description": "The revenue generated by the player in EUR",
+          "range": "xsd:decimal",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "lastLoginPlatform",
+          "label": "Last Login Platform",
+          "description": "The platform on which the player last logged in",
+          "range": "xsd:string",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "totalBetsCasino",
+          "label": "Total Bets Casino",
+          "description": "The total amount bet by the player in casino games",
+          "range": "xsd:decimal",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "totalBetsSport",
+          "label": "Total Bets Sport",
+          "description": "The total amount bet by the player in sports",
+          "range": "xsd:decimal",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "depositsCountCasino",
+          "label": "Deposits Count Casino",
+          "description": "The number of deposits made for casino games",
+          "range": "xsd:integer",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "depositsCountSport",
+          "label": "Deposits Count Sport",
+          "description": "The number of deposits made for sports betting",
+          "range": "xsd:integer",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "firstDepositMethod",
+          "label": "First Deposit Method",
+          "description": "The payment method used for the first deposit",
+          "range": "xsd:string",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "lastDepositMethod",
+          "label": "Last Deposit Method",
+          "description": "The payment method used for the last deposit",
+          "range": "xsd:string",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "affordabilityStatus",
+          "label": "Affordability Status",
+          "description": "The affordability status of the player for responsible gaming",
+          "range": "xsd:string",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "affordabilityBalance",
+          "label": "Affordability Balance",
+          "description": "The affordability balance threshold for the player",
+          "range": "xsd:decimal",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "communicationPreferences",
+          "label": "Communication Preferences",
+          "description": "The player's communication preferences for different channels",
+          "range": "CommunicationPreference",
+          "required": false,
+          "functionalProperty": false,
+          "cardinality": "many"
+        },
+        {
+          "id": "responsibleGamingLimits",
+          "label": "Responsible Gaming Limits",
+          "description": "The responsible gaming limits set by the player",
+          "range": "ResponsibleGamingLimit",
+          "required": false,
+          "functionalProperty": false,
+          "cardinality": "many"
+        },
+        {
+          "id": "playerStatus",
+          "label": "Player Status",
+          "description": "The current status of the player account",
+          "range": "PlayerStatus",
+          "required": true,
+          "functionalProperty": true
+        },
+        {
+          "id": "kycStatus",
+          "label": "KYC Status",
+          "description": "The Know Your Customer verification status of the player",
+          "range": "KYCStatus",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "riskScore",
+          "label": "Risk Score",
+          "description": "The risk score assigned to the player for compliance purposes",
+          "range": "xsd:integer",
+          "required": false,
+          "functionalProperty": true
+        }
+      ]
+    },
+    {
+      "id": "Game",
+      "label": "Game",
+      "description": "A gaming product that can be played by users",
+      "properties": [
+        {
+          "id": "gameID",
+          "label": "Game ID",
+          "description": "The unique identifier for the game",
+          "range": "xsd:integer",
+          "required": true,
+          "functionalProperty": true
+        },
+        {
+          "id": "gameName",
+          "label": "Game Name",
+          "description": "The name of the game",
+          "range": "xsd:string",
+          "required": true,
+          "functionalProperty": true
+        },
+        {
+          "id": "provider",
+          "label": "Provider",
+          "description": "The provider of the game",
+          "range": "xsd:string",
+          "required": true,
+          "functionalProperty": true
+        },
+        {
+          "id": "subProvider",
+          "label": "Sub-Provider",
+          "description": "The sub-provider of the game",
+          "range": "xsd:string",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "gameType",
+          "label": "Game Type",
+          "description": "The type of the game",
+          "range": "GameType",
+          "required": true,
+          "functionalProperty": true
+        },
+        {
+          "id": "gameFilters",
+          "label": "Game Filters",
+          "description": "The filters that can be applied to the game",
+          "range": "xsd:string",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "gameOrder",
+          "label": "Game Order",
+          "description": "The display order of the game",
+          "range": "xsd:integer",
+          "required": true,
+          "functionalProperty": true
+        },
+        {
+          "id": "isActive",
+          "label": "Is Active",
+          "description": "Whether the game is active",
+          "range": "xsd:boolean",
+          "required": true,
+          "functionalProperty": true
+        },
+        {
+          "id": "demoEnabled",
+          "label": "Demo Enabled",
+          "description": "Whether the game can be played in demo mode",
+          "range": "xsd:boolean",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "wagerPercent",
+          "label": "Wager Percent",
+          "description": "The percentage of the wager that contributes to wagering requirements",
+          "range": "xsd:float",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "jackpotContribution",
+          "label": "Jackpot Contribution",
+          "description": "The percentage of the wager that contributes to jackpots",
+          "range": "xsd:float",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "payoutLow",
+          "label": "Payout Low",
+          "description": "The low end of the payout range",
+          "range": "xsd:float",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "payoutHigh",
+          "label": "Payout High",
+          "description": "The high end of the payout range",
+          "range": "xsd:float",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "volatility",
+          "label": "Volatility",
+          "description": "The volatility level of the game",
+          "range": "xsd:string",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "ukCompliant",
+          "label": "UK Compliant",
+          "description": "Whether the game complies with UK regulations",
+          "range": "xsd:boolean",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "isDesktop",
+          "label": "Is Desktop",
+          "description": "Whether the game is available on desktop",
+          "range": "xsd:boolean",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "isMobile",
+          "label": "Is Mobile",
+          "description": "Whether the game is available on mobile",
+          "range": "xsd:boolean",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "serverGameID",
+          "label": "Server Game ID",
+          "description": "The game identifier on the provider's server",
+          "range": "xsd:string",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "createdDate",
+          "label": "Created Date",
+          "description": "The date when the game was created",
+          "range": "xsd:dateTime",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "releaseDate",
+          "label": "Release Date",
+          "description": "The date when the game was released",
+          "range": "xsd:dateTime",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "updatedDate",
+          "label": "Updated Date",
+          "description": "The date when the game was last updated",
+          "range": "xsd:dateTime",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "hideInLobby",
+          "label": "Hide In Lobby",
+          "description": "Whether the game is hidden in the lobby",
+          "range": "xsd:boolean",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "excludedCountries",
+          "label": "Excluded Countries",
+          "description": "Countries where the game is not available",
+          "range": "xsd:string",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "excludedJurisdictions",
+          "label": "Excluded Jurisdictions",
+          "description": "Jurisdictions where the game is not available",
+          "range": "xsd:string",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "gameDescription",
+          "label": "Game Description",
+          "description": "The description of the game",
+          "range": "xsd:string",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "returnToPlayer",
+          "label": "Return to Player",
+          "description": "The theoretical return to player percentage",
+          "range": "xsd:float",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "hasJackpot",
+          "label": "Has Jackpot",
+          "description": "Whether the game has a jackpot",
+          "range": "xsd:boolean",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "gameFeatures",
+          "label": "Game Features",
+          "description": "Special features of the game",
+          "range": "GameFeature",
+          "required": false,
+          "functionalProperty": false,
+          "cardinality": "many"
+        }
+      ]
+    },
+    {
+      "id": "Transaction",
+      "label": "Transaction",
+      "description": "A financial transaction within the gaming platform",
+      "properties": [
+        {
+          "id": "transactionID",
+          "label": "Transaction ID",
+          "description": "The unique identifier for the transaction",
+          "range": "xsd:long",
+          "required": true,
+          "functionalProperty": true
+        },
+        {
+          "id": "playerID",
+          "label": "Player ID",
+          "description": "The identifier of the player associated with the transaction",
+          "range": "xsd:long",
+          "required": true,
+          "functionalProperty": true
+        },
+        {
+          "id": "transactionDate",
+          "label": "Transaction Date",
+          "description": "The date and time of the transaction",
+          "range": "xsd:dateTime",
+          "required": true,
+          "functionalProperty": true
+        },
+        {
+          "id": "transactionType",
+          "label": "Transaction Type",
+          "description": "The type of the transaction",
+          "range": "TransactionType",
+          "required": true,
+          "functionalProperty": true
+        },
+        {
+          "id": "transactionAmount",
+          "label": "Transaction Amount",
+          "description": "The amount of the transaction",
+          "range": "xsd:decimal",
+          "required": true,
+          "functionalProperty": true
+        },
+        {
+          "id": "transactionOriginalAmount",
+          "label": "Transaction Original Amount",
+          "description": "The original amount of the transaction before currency conversion",
+          "range": "xsd:decimal",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "transactionDetails",
+          "label": "Transaction Details",
+          "description": "Additional details about the transaction",
+          "range": "xsd:string",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "platform",
+          "label": "Platform",
+          "description": "The platform on which the transaction occurred",
+          "range": "xsd:string",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "status",
+          "label": "Status",
+          "description": "The status of the transaction",
+          "range": "TransactionStatus",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "currencyCode",
+          "label": "Currency Code",
+          "description": "The currency code of the transaction",
+          "range": "xsd:string",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "paymentMethod",
+          "label": "Payment Method",
+          "description": "The payment method used for the transaction",
+          "range": "xsd:string",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "paymentProvider",
+          "label": "Payment Provider",
+          "description": "The payment provider used for the transaction",
+          "range": "xsd:string",
+          "required": false,
+          "functionalProperty": true
+        }
+      ]
+    },
+    {
+      "id": "Bonus",
+      "label": "Bonus",
+      "description": "A bonus offered to players",
+      "properties": [
+        {
+          "id": "bonusID",
+          "label": "Bonus ID",
+          "description": "The unique identifier for the bonus",
+          "range": "xsd:integer",
+          "required": true,
+          "functionalProperty": true
+        },
+        {
+          "id": "bonusName",
+          "label": "Bonus Name",
+          "description": "The name of the bonus",
+          "range": "xsd:string",
+          "required": true,
+          "functionalProperty": true
+        },
+        {
+          "id": "internalName",
+          "label": "Internal Name",
+          "description": "The internal name of the bonus",
+          "range": "xsd:string",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "description",
+          "label": "Description",
+          "description": "The description of the bonus",
+          "range": "xsd:string",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "percentage",
+          "label": "Percentage",
+          "description": "The percentage value of the bonus",
+          "range": "xsd:decimal",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "percentageUpToAmount",
+          "label": "Percentage Up To Amount",
+          "description": "The maximum amount for percentage bonuses",
+          "range": "xsd:decimal",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "divisions",
+          "label": "Divisions",
+          "description": "The number of divisions for the bonus",
+          "range": "xsd:integer",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "bonusAmount",
+          "label": "Bonus Amount",
+          "description": "The fixed amount of the bonus",
+          "range": "xsd:decimal",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "status",
+          "label": "Status",
+          "description": "The status of the bonus",
+          "range": "xsd:string",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "couponCode",
+          "label": "Coupon Code",
+          "description": "The coupon code to claim the bonus",
+          "range": "xsd:string",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "givenUpon",
+          "label": "Given Upon",
+          "description": "The condition for giving the bonus",
+          "range": "xsd:string",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "startDate",
+          "label": "Start Date",
+          "description": "The start date of the bonus availability",
+          "range": "xsd:dateTime",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "endDate",
+          "label": "End Date",
+          "description": "The end date of the bonus availability",
+          "range": "xsd:dateTime",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "wagerFactor",
+          "label": "Wager Factor",
+          "description": "The wagering requirement factor for the bonus",
+          "range": "xsd:decimal",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "minDeposit",
+          "label": "Min Deposit",
+          "description": "The minimum deposit required to qualify for the bonus",
+          "range": "xsd:decimal",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "bonusType",
+          "label": "Bonus Type",
+          "description": "The type of the bonus",
+          "range": "BonusType",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "isSportBonus",
+          "label": "Is Sport Bonus",
+          "description": "Whether the bonus is for sports betting",
+          "range": "xsd:boolean",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "eligibilityRules",
+          "label": "Eligibility Rules",
+          "description": "Rules that determine player eligibility for the bonus",
+          "range": "EligibilityRule",
+          "required": false,
+          "functionalProperty": false,
+          "cardinality": "many"
+        }
+      ]
+    },
+    {
+      "id": "BonusBalance",
+      "label": "Bonus Balance",
+      "description": "A bonus balance for a player",
+      "properties": [
+        {
+          "id": "bonusBalanceID",
+          "label": "Bonus Balance ID",
+          "description": "The unique identifier for the bonus balance",
+          "range": "xsd:long",
+          "required": true,
+          "functionalProperty": true
+        },
+        {
+          "id": "playerID",
+          "label": "Player ID",
+          "description": "The identifier of the player",
+          "range": "xsd:long",
+          "required": true,
+          "functionalProperty": true
+        },
+        {
+          "id": "bonusID",
+          "label": "Bonus ID",
+          "description": "The identifier of the bonus",
+          "range": "xsd:integer",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "amount",
+          "label": "Amount",
+          "description": "The initial amount of the bonus",
+          "range": "xsd:decimal",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "balance",
+          "label": "Balance",
+          "description": "The current balance of the bonus",
+          "range": "xsd:decimal",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "status",
+          "label": "Status",
+          "description": "The status of the bonus balance",
+          "range": "xsd:string",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "wagerLeft",
+          "label": "Wager Left",
+          "description": "The amount left to wager to fulfill requirements",
+          "range": "xsd:decimal",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "originalDepositAmount",
+          "label": "Original Deposit Amount",
+          "description": "The original deposit amount associated with the bonus",
+          "range": "xsd:decimal",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "maxCashableWinnings",
+          "label": "Max Cashable Winnings",
+          "description": "The maximum winnings that can be cashed out from the bonus",
+          "range": "xsd:decimal",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "amountConverted",
+          "label": "Amount Converted",
+          "description": "The amount converted to real money",
+          "range": "xsd:decimal",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "isSportBonus",
+          "label": "Is Sport Bonus",
+          "description": "Whether the bonus is for sports betting",
+          "range": "xsd:boolean",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "freeSpinsOffer",
+          "label": "Free Spins Offer",
+          "description": "The free spins offer associated with the bonus",
+          "range": "xsd:string",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "freeSpinsAmount",
+          "label": "Free Spins Amount",
+          "description": "The number of free spins granted",
+          "range": "xsd:integer",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "freeSpinsLeft",
+          "label": "Free Spins Left",
+          "description": "The number of free spins remaining",
+          "range": "xsd:integer",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "creationDate",
+          "label": "Creation Date",
+          "description": "The date when the bonus balance was created",
+          "range": "xsd:dateTime",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "lossConditionDate",
+          "label": "Loss Condition Date",
+          "description": "The date when the bonus will be lost if conditions are not met",
+          "range": "xsd:dateTime",
+          "required": false,
+          "functionalProperty": true
+        }
+      ]
+    },
+    {
+      "id": "Country",
+      "label": "Country",
+      "description": "A country in the world",
+      "properties": [
+        {
+          "id": "countryID",
+          "label": "Country ID",
+          "description": "The unique identifier for the country",
+          "range": "xsd:integer",
+          "required": true,
+          "functionalProperty": true
+        },
+        {
+          "id": "countryName",
+          "label": "Country Name",
+          "description": "The name of the country",
+          "range": "xsd:string",
+          "required": true,
+          "functionalProperty": true
+        },
+        {
+          "id": "isActive",
+          "label": "Is Active",
+          "description": "Whether the country is active for gaming",
+          "range": "xsd:boolean",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "countryIntlCode",
+          "label": "Country International Code",
+          "description": "The international code of the country (ISO)",
+          "range": "xsd:string",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "phoneCode",
+          "label": "Phone Code",
+          "description": "The phone code of the country",
+          "range": "xsd:string",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "isoCode",
+          "label": "ISO Code",
+          "description": "The ISO code of the country",
+          "range": "xsd:string",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "jurisdictionCode",
+          "label": "Jurisdiction Code",
+          "description": "The jurisdiction code of the country",
+          "range": "xsd:string",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "defaultLanguage",
+          "label": "Default Language",
+          "description": "The default language of the country",
+          "range": "xsd:integer",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "defaultCurrency",
+          "label": "Default Currency",
+          "description": "The default currency of the country",
+          "range": "xsd:integer",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "jurisdictionID",
+          "label": "Jurisdiction ID",
+          "description": "The identifier of the jurisdiction for the country",
+          "range": "xsd:integer",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "regulatoryRequirements",
+          "label": "Regulatory Requirements",
+          "description": "Special regulatory requirements for the country",
+          "range": "RegulatoryRequirement",
+          "required": false,
+          "functionalProperty": false,
+          "cardinality": "many"
+        }
+      ]
+    },
+    {
+      "id": "Currency",
+      "label": "Currency",
+      "description": "A currency used on the gaming platform",
+      "properties": [
+        {
+          "id": "currencyID",
+          "label": "Currency ID",
+          "description": "The unique identifier for the currency",
+          "range": "xsd:integer",
+          "required": true,
+          "functionalProperty": true
+        },
+        {
+          "id": "currencyName",
+          "label": "Currency Name",
+          "description": "The name of the currency",
+          "range": "xsd:string",
+          "required": true,
+          "functionalProperty": true
+        },
+        {
+          "id": "currencySymbol",
+          "label": "Currency Symbol",
+          "description": "The symbol of the currency",
+          "range": "xsd:string",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "currencyCode",
+          "label": "Currency Code",
+          "description": "The code of the currency",
+          "range": "xsd:string",
+          "required": true,
+          "functionalProperty": true
+        },
+        {
+          "id": "rateInEUR",
+          "label": "Rate in EUR",
+          "description": "The exchange rate of the currency to EUR",
+          "range": "xsd:decimal",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "rateInUSD",
+          "label": "Rate in USD",
+          "description": "The exchange rate of the currency to USD",
+          "range": "xsd:decimal",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "rateInGBP",
+          "label": "Rate in GBP",
+          "description": "The exchange rate of the currency to GBP",
+          "range": "xsd:decimal",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "multiplier",
+          "label": "Multiplier",
+          "description": "The multiplier for the currency",
+          "range": "xsd:integer",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "forLanguages",
+          "label": "For Languages",
+          "description": "The languages for which the currency is applicable",
+          "range": "xsd:string",
+          "required": false,
+          "functionalProperty": true
+        }
+      ]
+    },
+    {
+      "id": "WhiteLabel",
+      "label": "White Label",
+      "description": "A branded instance of the gaming platform",
+      "properties": [
+        {
+          "id": "labelID",
+          "label": "Label ID",
+          "description": "The unique identifier for the white label",
+          "range": "xsd:integer",
+          "required": true,
+          "functionalProperty": true
+        },
+        {
+          "id": "labelName",
+          "label": "Label Name",
+          "description": "The name of the white label",
+          "range": "xsd:string",
+          "required": true,
+          "functionalProperty": true
+        },
+        {
+          "id": "labelUrlName",
+          "label": "Label URL Name",
+          "description": "The URL name of the white label",
+          "range": "xsd:string",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "labelUrl",
+          "label": "Label URL",
+          "description": "The URL of the white label",
+          "range": "xsd:string",
+          "required": true,
+          "functionalProperty": true
+        },
+        {
+          "id": "defaultLanguage",
+          "label": "Default Language",
+          "description": "The default language of the white label",
+          "range": "xsd:string",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "defaultCountry",
+          "label": "Default Country",
+          "description": "The default country of the white label",
+          "range": "xsd:integer",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "defaultCurrency",
+          "label": "Default Currency",
+          "description": "The default currency of the white label",
+          "range": "xsd:integer",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "welcomeBonusDesc",
+          "label": "Welcome Bonus Description",
+          "description": "The description of the welcome bonus for the white label",
+          "range": "xsd:string",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "restrictedCountries",
+          "label": "Restricted Countries",
+          "description": "Countries restricted from accessing the white label",
+          "range": "xsd:string",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "foundedYear",
+          "label": "Founded Year",
+          "description": "The year when the white label was founded",
+          "range": "xsd:string",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "sportEnabled",
+          "label": "Sport Enabled",
+          "description": "Whether sports betting is enabled for the white label",
+          "range": "xsd:boolean",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "defaultPlayMode",
+          "label": "Default Play Mode",
+          "description": "The default play mode for the white label",
+          "range": "xsd:string",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "isActive",
+          "label": "Is Active",
+          "description": "Whether the white label is active",
+          "range": "xsd:boolean",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "labelTitle",
+          "label": "Label Title",
+          "description": "The title of the white label",
+          "range": "xsd:string",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "excludedJurisdictions",
+          "label": "Excluded Jurisdictions",
+          "description": "Jurisdictions excluded from the white label",
+          "range": "xsd:string",
+          "required": false,
+          "functionalProperty": true
+        }
+      ]
+    },
+    {
+      "id": "GameSession",
+      "label": "Game Session",
+      "description": "A session of game play by a player",
+      "properties": [
+        {
+          "id": "sessionID",
+          "label": "Session ID",
+          "description": "The unique identifier for the game session",
+          "range": "xsd:long",
+          "required": true,
+          "functionalProperty": true
+        },
+        {
+          "id": "gameID",
+          "label": "Game ID",
+          "description": "The identifier of the game being played",
+          "range": "xsd:long",
+          "required": true,
+          "functionalProperty": true
+        },
+        {
+          "id": "playerID",
+          "label": "Player ID",
+          "description": "The identifier of the player playing the game",
+          "range": "xsd:long",
+          "required": true,
+          "functionalProperty": true
+        },
+        {
+          "id": "totalBet",
+          "label": "Total Bet",
+          "description": "The total amount bet in the session",
+          "range": "xsd:decimal",
+          "required": true,
+          "functionalProperty": true
+        },
+        {
+          "id": "totalBetAccount",
+          "label": "Total Bet Account",
+          "description": "The total amount bet from the account balance",
+          "range": "xsd:decimal",
+          "required": true,
+          "functionalProperty": true
+        },
+        {
+          "id": "totalBetBonus",
+          "label": "Total Bet Bonus",
+          "description": "The total amount bet from the bonus balance",
+          "range": "xsd:decimal",
+          "required": true,
+          "functionalProperty": true
+        },
+        {
+          "id": "totalWin",
+          "label": "Total Win",
+          "description": "The total amount won in the session",
+          "range": "xsd:decimal",
+          "required": true,
+          "functionalProperty": true
+        },
+        {
+          "id": "totalWinAccount",
+          "label": "Total Win Account",
+          "description": "The total amount won to the account balance",
+          "range": "xsd:decimal",
+          "required": true,
+          "functionalProperty": true
+        },
+        {
+          "id": "totalWinBonus",
+          "label": "Total Win Bonus",
+          "description": "The total amount won to the bonus balance",
+          "range": "xsd:decimal",
+          "required": true,
+          "functionalProperty": true
+        },
+        {
+          "id": "roundID",
+          "label": "Round ID",
+          "description": "The identifier of the game round",
+          "range": "xsd:long",
+          "required": true,
+          "functionalProperty": true
+        },
+        {
+          "id": "gameStatus",
+          "label": "Game Status",
+          "description": "The status of the game session",
+          "range": "xsd:integer",
+          "required": true,
+          "functionalProperty": true
+        },
+        {
+          "id": "currencyID",
+          "label": "Currency ID",
+          "description": "The identifier of the currency used",
+          "range": "xsd:integer",
+          "required": true,
+          "functionalProperty": true
+        },
+        {
+          "id": "creationDate",
+          "label": "Creation Date",
+          "description": "The date when the session was created",
+          "range": "xsd:dateTime",
+          "required": true,
+          "functionalProperty": true
+        },
+        {
+          "id": "updatedDate",
+          "label": "Updated Date",
+          "description": "The date when the session was last updated",
+          "range": "xsd:dateTime",
+          "required": true,
+          "functionalProperty": true
+        },
+        {
+          "id": "accountBalance",
+          "label": "Account Balance",
+          "description": "The account balance at the end of the session",
+          "range": "xsd:decimal",
+          "required": true,
+          "functionalProperty": true
+        },
+        {
+          "id": "bonusBalance",
+          "label": "Bonus Balance",
+          "description": "The bonus balance at the end of the session",
+          "range": "xsd:decimal",
+          "required": true,
+          "functionalProperty": true
+        },
+        {
+          "id": "device",
+          "label": "Device",
+          "description": "The device used for the game session",
+          "range": "xsd:string",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "ipAddress",
+          "label": "IP Address",
+          "description": "The IP address used for the game session",
+          "range": "xsd:string",
+          "required": false,
+          "functionalProperty": true
+        }
+      ]
+    },
+    {
+      "id": "SportBet",
+      "label": "Sport Bet",
+      "description": "A sports betting wager placed by a player",
+      "properties": [
+        {
+          "id": "betID",
+          "label": "Bet ID",
+          "description": "The unique identifier for the bet",
+          "range": "xsd:long",
+          "required": true,
+          "functionalProperty": true
+        },
+        {
+          "id": "playerID",
+          "label": "Player ID",
+          "description": "The identifier of the player placing the bet",
+          "range": "xsd:long",
+          "required": true,
+          "functionalProperty": true
+        },
+        {
+          "id": "betAmount",
+          "label": "Bet Amount",
+          "description": "The amount of the bet",
+          "range": "xsd:decimal",
+          "required": true,
+          "functionalProperty": true
+        },
+        {
+          "id": "potentialWin",
+          "label": "Potential Win",
+          "description": "The potential winning amount",
+          "range": "xsd:decimal",
+          "required": true,
+          "functionalProperty": true
+        },
+        {
+          "id": "actualWin",
+          "label": "Actual Win",
+          "description": "The actual winning amount",
+          "range": "xsd:decimal",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "betType",
+          "label": "Bet Type",
+          "description": "The type of the bet",
+          "range": "xsd:integer",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "oddTypeID",
+          "label": "Odd Type ID",
+          "description": "The identifier of the odd type",
+          "range": "xsd:integer",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "sportID",
+          "label": "Sport ID",
+          "description": "The identifier of the sport",
+          "range": "xsd:integer",
+          "required": true,
+          "functionalProperty": true
+        },
+        {
+          "id": "regionID",
+          "label": "Region ID",
+          "description": "The identifier of the region",
+          "range": "xsd:integer",
+          "required": true,
+          "functionalProperty": true
+        },
+        {
+          "id": "competitionID",
+          "label": "Competition ID",
+          "description": "The identifier of the competition",
+          "range": "xsd:integer",
+          "required": true,
+          "functionalProperty": true
+        },
+        {
+          "id": "matchID",
+          "label": "Match ID",
+          "description": "The identifier of the match",
+          "range": "xsd:integer",
+          "required": true,
+          "functionalProperty": true
+        },
+        {
+          "id": "marketID",
+          "label": "Market ID",
+          "description": "The identifier of the market",
+          "range": "xsd:integer",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "isLive",
+          "label": "Is Live",
+          "description": "Whether the bet is live",
+          "range": "xsd:boolean",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "betState",
+          "label": "Bet State",
+          "description": "The state of the bet",
+          "range": "xsd:integer",
+          "required": true,
+          "functionalProperty": true
+        },
+        {
+          "id": "placedDate",
+          "label": "Placed Date",
+          "description": "The date when the bet was placed",
+          "range": "xsd:dateTime",
+          "required": true,
+          "functionalProperty": true
+        },
+        {
+          "id": "settledDate",
+          "label": "Settled Date",
+          "description": "The date when the bet was settled",
+          "range": "xsd:dateTime",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "odds",
+          "label": "Odds",
+          "description": "The odds of the bet",
+          "range": "xsd:float",
+          "required": true,
+          "functionalProperty": true
+        },
+        {
+          "id": "selectionName",
+          "label": "Selection Name",
+          "description": "The name of the selection",
+          "range": "xsd:string",
+          "required": false,
+          "functionalProperty": true
+        }
+      ]
+    },
+    {
+      "id": "SportEvent",
+      "label": "Sport Event",
+      "description": "A sporting event on which bets can be placed",
+      "properties": [
+        {
+          "id": "eventID",
+          "label": "Event ID",
+          "description": "The unique identifier for the event",
+          "range": "xsd:integer",
+          "required": true,
+          "functionalProperty": true
+        },
+        {
+          "id": "eventName",
+          "label": "Event Name",
+          "description": "The name of the event",
+          "range": "xsd:string",
+          "required": true,
+          "functionalProperty": true
+        },
+        {
+          "id": "sportID",
+          "label": "Sport ID",
+          "description": "The identifier of the sport",
+          "range": "xsd:integer",
+          "required": true,
+          "functionalProperty": true
+        },
+        {
+          "id": "regionID",
+          "label": "Region ID",
+          "description": "The identifier of the region",
+          "range": "xsd:integer",
+          "required": true,
+          "functionalProperty": true
+        },
+        {
+          "id": "competitionID",
+          "label": "Competition ID",
+          "description": "The identifier of the competition",
+          "range": "xsd:integer",
+          "required": true,
+          "functionalProperty": true
+        },
+        {
+          "id": "startDate",
+          "label": "Start Date",
+          "description": "The start date and time of the event",
+          "range": "xsd:dateTime",
+          "required": true,
+          "functionalProperty": true
+        },
+        {
+          "id": "endDate",
+          "label": "End Date",
+          "description": "The end date and time of the event",
+          "range": "xsd:dateTime",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "status",
+          "label": "Status",
+          "description": "The status of the event",
+          "range": "xsd:string",
+          "required": true,
+          "functionalProperty": true
+        },
+        {
+          "id": "isLive",
+          "label": "Is Live",
+          "description": "Whether the event is currently live",
+          "range": "xsd:boolean",
+          "required": true,
+          "functionalProperty": true
+        },
+        {
+          "id": "competitors",
+          "label": "Competitors",
+          "description": "The competitors participating in the event",
+          "range": "Competitor",
+          "required": true,
+          "functionalProperty": false,
+          "cardinality": "many"
+        },
+        {
+          "id": "markets",
+          "label": "Markets",
+          "description": "The betting markets available for the event",
+          "range": "Market",
+          "required": false,
+          "functionalProperty": false,
+          "cardinality": "many"
+        }
+      ]
+    },
+    {
+      "id": "BigWinner",
+      "label": "Big Winner",
+      "description": "A record of a significant winning by a player",
+      "properties": [
+        {
+          "id": "transactionID",
+          "label": "Transaction ID",
+          "description": "The unique identifier for the transaction",
+          "range": "xsd:long",
+          "required": true,
+          "functionalProperty": true
+        },
+        {
+          "id": "playerID",
+          "label": "Player ID",
+          "description": "The identifier of the player who won",
+          "range": "xsd:long",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "gameID",
+          "label": "Game ID",
+          "description": "The identifier of the game in which the win occurred",
+          "range": "xsd:integer",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "amount",
+          "label": "Amount",
+          "description": "The amount of the win",
+          "range": "xsd:decimal",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "date",
+          "label": "Date",
+          "description": "The date and time of the win",
+          "range": "xsd:dateTime",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "playerName",
+          "label": "Player Name",
+          "description": "The name of the player who won",
+          "range": "xsd:string",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "country",
+          "label": "Country",
+          "description": "The country of the player who won",
+          "range": "xsd:string",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "currency",
+          "label": "Currency",
+          "description": "The currency of the win",
+          "range": "xsd:string",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "amountInCurrency",
+          "label": "Amount in Currency",
+          "description": "The amount of the win in the player's currency",
+          "range": "xsd:string",
+          "required": false,
+          "functionalProperty": true
+        }
+      ]
+    },
+    {
+      "id": "WithdrawalRequest",
+      "label": "Withdrawal Request",
+      "description": "A request by a player to withdraw funds",
+      "properties": [
+        {
+          "id": "requestID",
+          "label": "Request ID",
+          "description": "The unique identifier for the withdrawal request",
+          "range": "xsd:long",
+          "required": true,
+          "functionalProperty": true
+        },
+        {
+          "id": "playerID",
+          "label": "Player ID",
+          "description": "The identifier of the player making the request",
+          "range": "xsd:long",
+          "required": true,
+          "functionalProperty": true
+        },
+        {
+          "id": "requestDate",
+          "label": "Request Date",
+          "description": "The date and time of the request",
+          "range": "xsd:dateTime",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "amount",
+          "label": "Amount",
+          "description": "The amount of the withdrawal",
+          "range": "xsd:decimal",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "status",
+          "label": "Status",
+          "description": "The status of the withdrawal request",
+          "range": "xsd:string",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "handlingType",
+          "label": "Handling Type",
+          "description": "The handling type for the withdrawal request",
+          "range": "xsd:string",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "withdrawalMethod",
+          "label": "Withdrawal Method",
+          "description": "The method used for the withdrawal",
+          "range": "xsd:string",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "approvalDate",
+          "label": "Approval Date",
+          "description": "The date when the withdrawal was approved",
+          "range": "xsd:dateTime",
+          "required": false,
+          "functionalProperty": true
+        },
+        {
+          "id": "rejectionReason",
+          "label": "Rejection Reason",
+          "description": "The reason for rejection if the withdrawal was rejected",
+          "range": "xsd:string",
+          "required": false,
+          "functionalProperty": true
+        }
+      ]
+    }
+  ],
+  "enumerations": [
+    {
+      "id": "PlayerStatus",
+      "label": "Player Status",
+      "description": "The status of a player account",
+      "values": [
+        {"id": "Active", "label": "Active"},
+        {"id": "Suspended", "label": "Suspended"},
+        {"id": "Blocked", "label": "Blocked"},
+        {"id": "Closed", "label": "Closed"},
+        {"id": "SelfExcluded", "label": "Self-Excluded"},
+        {"id": "PendingVerification", "label": "Pending Verification"},
+        {"id": "Dormant", "label": "Dormant"}
+      ]
+    },
+    {
+      "id": "KYCStatus",
+      "label": "KYC Status",
+      "description": "The Know Your Customer verification status of a player",
+      "values": [
+        {"id": "Verified", "label": "Verified"},
+        {"id": "Pending", "label": "Pending"},
+        {"id": "Rejected", "label": "Rejected"},
+        {"id": "NotSubmitted", "label": "Not Submitted"},
+        {"id": "PartiallyVerified", "label": "Partially Verified"},
+        {"id": "VerificationRequired", "label": "Verification Required"}
+      ]
+    },
+    {
+      "id": "GameType",
+      "label": "Game Type",
+      "description": "The type of a game",
+      "values": [
+        {"id": "Slots", "label": "Slots"},
+        {"id": "TableGames", "label": "Table Games"},
+        {"id": "LiveDealer", "label": "Live Dealer"},
+        {"id": "Jackpot", "label": "Jackpot"},
+        {"id": "VideoPoker", "label": "Video Poker"},
+        {"id": "Bingo", "label": "Bingo"},
+        {"id": "Scratch", "label": "Scratch Cards"},
+        {"id": "Virtual", "label": "Virtual Sports"},
+        {"id": "Other", "label": "Other"}
+      ]
+    },
+    {
+      "id": "GameFeature",
+      "label": "Game Feature",
+      "description": "Special features of a game",
+      "values": [
+        {"id": "FreeSpins", "label": "Free Spins"},
+        {"id": "WildSymbols", "label": "Wild Symbols"},
+        {"id": "ScatterSymbols", "label": "Scatter Symbols"},
+        {"id": "Multipliers", "label": "Multipliers"},
+        {"id": "BonusRounds", "label": "Bonus Rounds"},
+        {"id": "Jackpot", "label": "Jackpot"},
+        {"id": "Gamble", "label": "Gamble Feature"},
+        {"id": "ProgressiveJackpot", "label": "Progressive Jackpot"},
+        {"id": "Megaways", "label": "Megaways"},
+        {"id": "Cascading", "label": "Cascading Reels"}
+      ]
+    },
+    {
+      "id": "TransactionType",
+      "label": "Transaction Type",
+      "description": "The type of a financial transaction",
+      "values": [
+        {"id": "Deposit", "label": "Deposit"},
+        {"id": "Withdrawal", "label": "Withdrawal"},
+        {"id": "BonusIssue", "label": "Bonus Issue"},
+        {"id": "BonusRelease", "label": "Bonus Release"},
+        {"id": "GameBet", "label": "Game Bet"},
+        {"id": "GameWin", "label": "Game Win"},
+        {"id": "Adjustment", "label": "Adjustment"},
+        {"id": "Chargeback", "label": "Chargeback"},
+        {"id": "Refund", "label": "Refund"},
+        {"id": "Fee", "label": "Fee"},
+        {"id": "SportBet", "label": "Sport Bet"},
+        {"id": "SportWin", "label": "Sport Win"}
+      ]
+    },
+    {
+      "id": "TransactionStatus",
+      "label": "Transaction Status",
+      "description": "The status of a financial transaction",
+      "values": [
+        {"id": "Pending", "label": "Pending"},
+        {"id": "Completed", "label": "Completed"},
+        {"id": "Failed", "label": "Failed"},
+        {"id": "Cancelled", "label": "Cancelled"},
+        {"id": "Refunded", "label": "Refunded"},
+        {"id": "Processing", "label": "Processing"}
+      ]
+    },
+    {
+      "id": "BonusType",
+      "label": "Bonus Type",
+      "description": "The type of a bonus",
+      "values": [
+        {"id": "Welcome", "label": "Welcome Bonus"},
+        {"id": "Deposit", "label": "Deposit Bonus"},
+        {"id": "NoDeposit", "label": "No Deposit Bonus"},
+        {"id": "FreeSpins", "label": "Free Spins"},
+        {"id": "Cashback", "label": "Cashback"},
+        {"id": "Reload", "label": "Reload Bonus"},
+        {"id": "Loyalty", "label": "Loyalty Bonus"},
+        {"id": "Referral", "label": "Referral Bonus"},
+        {"id": "Tournament", "label": "Tournament Prize"},
+        {"id": "FreeBet", "label": "Free Bet"},
+        {"id": "BetInsurance", "label": "Bet Insurance"}
+      ]
+    },
+    {
+      "id": "CommunicationPreference",
+      "label": "Communication Preference",
+      "description": "Communication preferences for different channels",
+      "values": [
+        {"id": "EmailMarketing", "label": "Email Marketing"},
+        {"id": "SMSMarketing", "label": "SMS Marketing"},
+        {"id": "PushNotifications", "label": "Push Notifications"},
+        {"id": "PhoneCalls", "label": "Phone Calls"},
+        {"id": "PostalMail", "label": "Postal Mail"},
+        {"id": "PartnerMarketing", "label": "Partner Marketing"}
+      ]
+    },
+    {
+      "id": "ResponsibleGamingLimit",
+      "label": "Responsible Gaming Limit",
+      "description": "Limits set by players for responsible gaming",
+      "values": [
+        {"id": "DepositLimit", "label": "Deposit Limit"},
+        {"id": "LossLimit", "label": "Loss Limit"},
+        {"id": "WagerLimit", "label": "Wager Limit"},
+        {"id": "SessionTimeLimit", "label": "Session Time Limit"},
+        {"id": "TimeOut", "label": "Time Out"},
+        {"id": "SelfExclusion", "label": "Self Exclusion"},
+        {"id": "RealityCheck", "label": "Reality Check"},
+        {"id": "MaxBetLimit", "label": "Max Bet Limit"}
+      ]
+    },
+    {
+      "id": "RegulatoryRequirement",
+      "label": "Regulatory Requirement",
+      "description": "Regulatory requirements for different jurisdictions",
+      "values": [
+        {"id": "AgeVerification", "label": "Age Verification"},
+        {"id": "SourceOfFunds", "label": "Source of Funds"},
+        {"id": "ResponsibleGamingTools", "label": "Responsible Gaming Tools"},
+        {"id": "GameTestingCertification", "label": "Game Testing Certification"},
+        {"id": "DataProtection", "label": "Data Protection"},
+        {"id": "DisputeResolution", "label": "Dispute Resolution"},
+        {"id": "AdvertisingRestrictions", "label": "Advertising Restrictions"},
+        {"id": "GamblingTax", "label": "Gambling Tax"},
+        {"id": "AML", "label": "Anti-Money Laundering"},
+        {"id": "KYC", "label": "Know Your Customer"},
+        {"id": "GameRules", "label": "Game Rules Transparency"}
+      ]
+    }
+  ],
+  "relationships": [
+    {
+      "id": "PlayerToGameSession",
+      "label": "Participates In",
+      "description": "A player participates in a game session",
+      "domain": "Player",
+      "range": "GameSession",
+      "inverse": "HasParticipant",
+      "cardinality": "one-to-many"
+    },
+    {
+      "id": "PlayerToTransaction",
+      "label": "Has Transaction",
+      "description": "A player has a financial transaction",
+      "domain": "Player",
+      "range": "Transaction",
+      "inverse": "BelongsToPlayer",
+      "cardinality": "one-to-many"
+    },
+    {
+      "id": "PlayerToBonusBalance",
+      "label": "Has Bonus Balance",
+      "description": "A player has a bonus balance",
+      "domain": "Player",
+      "range": "BonusBalance",
+      "inverse": "BelongsToPlayer",
+      "cardinality": "one-to-many"
+    },
+    {
+      "id": "PlayerToSportBet",
+      "label": "Places Bet",
+      "description": "A player places a sports bet",
+      "domain": "Player",
+      "range": "SportBet",
+      "inverse": "PlacedByPlayer",
+      "cardinality": "one-to-many"
+    },
+    {
+      "id": "GameToBigWinner",
+      "label": "Has Big Winner",
+      "description": "A game has a big winner",
+      "domain": "Game",
+      "range": "BigWinner",
+      "inverse": "WonOn",
+      "cardinality": "one-to-many"
+    },
+    {
+      "id": "GameToGameSession",
+      "label": "Has Session",
+      "description": "A game has a game session",
+      "domain": "Game",
+      "range": "GameSession",
+      "inverse": "IsSessionOf",
+      "cardinality": "one-to-many"
+    },
+    {
+      "id": "SportEventToSportBet",
+      "label": "Has Bet",
+      "description": "A sport event has bets placed on it",
+      "domain": "SportEvent",
+      "range": "SportBet",
+      "inverse": "PlacedOn",
+      "cardinality": "one-to-many"
+    },
+    {
+      "id": "WhiteLabelToPlayer",
+      "label": "Has Player",
+      "description": "A white label has registered players",
+      "domain": "WhiteLabel",
+      "range": "Player",
+      "inverse": "RegisteredWith",
+      "cardinality": "one-to-many"
+    },
+    {
+      "id": "WhiteLabelToGame",
+      "label": "Offers Game",
+      "description": "A white label offers games to play",
+      "domain": "WhiteLabel",
+      "range": "Game",
+      "inverse": "OfferedBy",
+      "cardinality": "many-to-many"
+    },
+    {
+      "id": "BonusToBonusBalance",
+      "label": "Has Instance",
+      "description": "A bonus has instances as bonus balances",
+      "domain": "Bonus",
+      "range": "BonusBalance",
+      "inverse": "IsInstanceOf",
+      "cardinality": "one-to-many"
+    },
+    {
+      "id": "PlayerToBigWinner",
+      "label": "Is Big Winner",
+      "description": "A player is a big winner",
+      "domain": "Player",
+      "range": "BigWinner",
+      "inverse": "HasBigWinner",
+      "cardinality": "one-to-many"
+    },
+    {
+      "id": "PlayerToWithdrawalRequest",
+      "label": "Requests Withdrawal",
+      "description": "A player requests a withdrawal",
+      "domain": "Player",
+      "range": "WithdrawalRequest",
+      "inverse": "RequestedByPlayer",
+      "cardinality": "one-to-many"
+    }
+  ]
+}

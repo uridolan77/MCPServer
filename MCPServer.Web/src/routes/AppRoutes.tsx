@@ -24,6 +24,7 @@ const UserDetailsPage = lazy(() => import('@/pages/users/UserDetailsPage'));
 const ChatPlaygroundPage = lazy(() => import('@/pages/playground/ChatPlaygroundPage'));
 const DataTransferPage = lazy(() => import('@/pages/transfer/DataTransferPage'));
 const DatabaseSchemaMapperPage = lazy(() => import('@/pages/transfer/DatabaseSchemaMapperPage'));
+const SemanticLayerAlignmentPage = lazy(() => import('@/pages/semantic-alignment/SemanticLayerAlignmentPage'));
 // const ProfilePage = lazy(() => import('@/pages/profile/ProfilePage'));
 // const NotFoundPage = lazy(() => import('@/pages/errors/NotFoundPage'));
 // const UnauthorizedPage = lazy(() => import('@/pages/errors/UnauthorizedPage'));
@@ -94,6 +95,7 @@ export const AppRoutes: React.FC = () => {
           {/* Data Transfer routes */}
           <Route path="/data-transfer" element={<DataTransferPage />} />
           <Route path="/transfer/schema-mapper" element={<DatabaseSchemaMapperPage />} />
+          <Route path="/semantic-alignment" element={<SemanticLayerAlignmentPage />} />
 
           {/* Chat Playground */}
           <Route path="/playground" element={<ChatPlaygroundPage />} />

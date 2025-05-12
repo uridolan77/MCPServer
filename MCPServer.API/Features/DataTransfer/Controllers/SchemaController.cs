@@ -2,13 +2,18 @@ using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.SqlClient;
+using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using MCPServer.API.Features.DataTransfer.Models;
 using MCPServer.Core.Features.DataTransfer.Models;
+using MCPServer.Core.Data;
+using MCPServer.Core.Models.DataTransfer;
+using MCPServer.Core.Services.Interfaces;
 
 namespace MCPServer.API.Features.DataTransfer.Controllers
 {
@@ -19,17 +24,23 @@ namespace MCPServer.API.Features.DataTransfer.Controllers
     {
         private readonly ILogger<SchemaController> _logger;
         private readonly IConfiguration _configuration;
+        private readonly ProgressPlayDbContext _progressPlayDbContext;
+        private readonly IConnectionStringResolverService _connectionStringResolver;
 
         public SchemaController(
             ILogger<SchemaController> logger,
-            IConfiguration configuration)
+            IConfiguration configuration,
+            ProgressPlayDbContext progressPlayDbContext,
+            IConnectionStringResolverService connectionStringResolver)
         {
             _logger = logger;
             _configuration = configuration;
+            _progressPlayDbContext = progressPlayDbContext;
+            _connectionStringResolver = connectionStringResolver;
         }
 
         [HttpGet("databases")]
-        public async Task<ActionResult<IEnumerable<string>>> GetDatabases([FromQuery] string? connectionId, [FromQuery] string? connectionString)
+        public async Task<ActionResult<IEnumerable<string>>> GetDatabases([FromQuery] int? connectionId, [FromQuery] string? connectionString)
         {
             try
             {
@@ -37,11 +48,13 @@ namespace MCPServer.API.Features.DataTransfer.Controllers
 
                 if (!string.IsNullOrEmpty(connectionString))
                 {
-                    effectiveConnectionString = connectionString;
+                    // Resolve any Azure Key Vault placeholders if present
+                    effectiveConnectionString = await _connectionStringResolver.ResolveConnectionStringAsync(connectionString);
                 }
-                else if (!string.IsNullOrEmpty(connectionId))
+                else if (connectionId.HasValue)
                 {
-                    effectiveConnectionString = GetConnectionString(connectionId);
+                    // Use our async method to get and resolve the connection string
+                    effectiveConnectionString = await GetConnectionString(connectionId.Value);
                 }
                 
                 if (string.IsNullOrEmpty(effectiveConnectionString))
@@ -80,12 +93,12 @@ namespace MCPServer.API.Features.DataTransfer.Controllers
 
         [HttpGet("schemas")]
         public async Task<ActionResult<IEnumerable<string>>> GetSchemas(
-            [FromQuery] string connectionId, 
+            [FromQuery] int connectionId, 
             [FromQuery] string database)
         {
             try
             {
-                string connectionString = GetConnectionString(connectionId);
+                string? connectionString = await GetConnectionString(connectionId);
                 
                 if (string.IsNullOrEmpty(connectionString))
                 {
@@ -129,13 +142,13 @@ namespace MCPServer.API.Features.DataTransfer.Controllers
 
         [HttpGet("tables")]
         public async Task<ActionResult<IEnumerable<TableInfo>>> GetTables(
-            [FromQuery] string connectionId,
+            [FromQuery] int connectionId,
             [FromQuery] string database,
             [FromQuery] string schema = "dbo")
         {
             try
             {
-                string connectionString = GetConnectionString(connectionId);
+                string? connectionString = await GetConnectionString(connectionId);
                 
                 if (string.IsNullOrEmpty(connectionString))
                 {
@@ -202,14 +215,14 @@ namespace MCPServer.API.Features.DataTransfer.Controllers
 
         [HttpGet("columns")]
         public async Task<ActionResult<IEnumerable<ColumnInfo>>> GetColumns(
-            [FromQuery] string connectionId,
+            [FromQuery] int connectionId,
             [FromQuery] string database,
             [FromQuery] string tableName,
             [FromQuery] string schema = "dbo")
         {
             try
             {
-                string connectionString = GetConnectionString(connectionId);
+                string? connectionString = await GetConnectionString(connectionId);
                 
                 if (string.IsNullOrEmpty(connectionString))
                 {
@@ -297,8 +310,8 @@ namespace MCPServer.API.Features.DataTransfer.Controllers
 
         [HttpPost("suggest-mapping")]
         public async Task<ActionResult<TableMapping>> SuggestMapping(
-            [FromQuery] string sourceConnectionId,
-            [FromQuery] string targetConnectionId,
+            [FromQuery] int sourceConnectionId,
+            [FromQuery] int targetConnectionId,
             [FromQuery] string sourceDatabase,
             [FromQuery] string targetDatabase,
             [FromQuery] string sourceTable,
@@ -314,8 +327,8 @@ namespace MCPServer.API.Features.DataTransfer.Controllers
                     targetTable = sourceTable;
                 }
                 
-                string sourceConnectionString = GetConnectionString(sourceConnectionId);
-                string targetConnectionString = GetConnectionString(targetConnectionId);
+                string? sourceConnectionString = await GetConnectionString(sourceConnectionId);
+                string? targetConnectionString = await GetConnectionString(targetConnectionId);
                 
                 if (string.IsNullOrEmpty(sourceConnectionString) || string.IsNullOrEmpty(targetConnectionString))
                 {
@@ -432,17 +445,38 @@ namespace MCPServer.API.Features.DataTransfer.Controllers
             }
         }
 
-        private string? GetConnectionString(string connectionId)
+        private async Task<string?> GetConnectionString(int connectionId)
         {
-            // In a production environment, you would get this from a database
-            // For now, we'll use hardcoded values based on ConnectionStrings section in config
-            return connectionId.ToLowerInvariant() switch
+            try
             {
-                "source" => _configuration.GetConnectionString("DataTransfer:Source"),
-                "target" => _configuration.GetConnectionString("DataTransfer:Target"),
-                // Attempt to parse as int for future DB lookup, for now, it won't resolve numeric IDs here
-                _ => int.TryParse(connectionId, out _) ? null : _configuration.GetConnectionString(connectionId) 
-            };
+                // Get the connection from the database using the ID
+                var connection = await _progressPlayDbContext.DataTransferConnections
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(c => c.ConnectionId == connectionId);
+                    
+                if (connection != null && !string.IsNullOrEmpty(connection.ConnectionString))
+                {
+                    _logger.LogInformation("Retrieved connection string from database for connection ID: {ConnectionId}", connectionId);
+                    
+                    // Resolve any Azure Key Vault placeholders in the connection string
+                    string resolvedConnectionString = await _connectionStringResolver.ResolveConnectionStringAsync(connection.ConnectionString);
+                    
+                    if (resolvedConnectionString != connection.ConnectionString)
+                    {
+                        _logger.LogInformation("Azure Key Vault placeholders resolved in connection string for ID: {ConnectionId}", connectionId);
+                    }
+                    
+                    return resolvedConnectionString;
+                }
+                
+                _logger.LogWarning("Connection ID {ConnectionId} not found in database or has empty connection string", connectionId);
+                return null;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving connection string for connection ID: {ConnectionId}", connectionId);
+                return null;
+            }
         }
         
         private async Task<List<ColumnInfo>> GetTableColumns(string connectionString, string tableName, string schema)

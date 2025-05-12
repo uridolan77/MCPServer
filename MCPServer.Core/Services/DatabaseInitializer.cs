@@ -1,23 +1,22 @@
 using System;
 using System.Threading.Tasks;
 using MCPServer.Core.Data;
-using MCPServer.Core.Data.DataSeeding;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace MCPServer.Core.Services
 {
+    // Adapter class that forwards to the new implementation in Features namespace
     public class DatabaseInitializer
     {
-        private readonly IServiceProvider _serviceProvider;
+        private readonly McpServerDbContext _dbContext;
         private readonly ILogger<DatabaseInitializer> _logger;
 
         public DatabaseInitializer(
-            IServiceProvider serviceProvider,
+            McpServerDbContext dbContext,
             ILogger<DatabaseInitializer> logger)
         {
-            _serviceProvider = serviceProvider;
+            _dbContext = dbContext;
             _logger = logger;
         }
 
@@ -25,30 +24,49 @@ namespace MCPServer.Core.Services
         {
             try
             {
-                using var scope = _serviceProvider.CreateScope();
-                var dbContext = scope.ServiceProvider.GetRequiredService<McpServerDbContext>();
-
-                // Check if database exists, create if not
-                _logger.LogInformation("Ensuring database exists...");
-                await dbContext.Database.EnsureCreatedAsync();
-
-                // We'll skip migrations for now due to compatibility issues
-                // await dbContext.Database.MigrateAsync();
-
-                // Additional API key seeding can be done here
-                // This allows us to set API keys without storing them in the code
-                var apiKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY");
-                if (!string.IsNullOrEmpty(apiKey))
+                _logger.LogInformation("Initializing database");
+                
+                // Check if database exists, if not create it
+                await _dbContext.Database.EnsureCreatedAsync();
+                
+                // Apply any pending migrations
+                if (_dbContext.Database.IsRelational())
                 {
-                    _logger.LogInformation("Setting OpenAI API key from environment variable");
-                    dbContext.SeedLlmProviderCredential(apiKey);
+                    try
+                    {
+                        _logger.LogInformation("Applying database migrations");
+                        await _dbContext.Database.MigrateAsync();
+                        _logger.LogInformation("Database migrations applied successfully");
+                    }
+                    catch (Exception migrateEx)
+                    {
+                        _logger.LogError(migrateEx, "Error applying database migrations. Will attempt to continue without migrations.");
+                        // Don't throw the exception here - try to continue without migrations
+                    }
                 }
-
+                
                 _logger.LogInformation("Database initialization completed successfully");
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "An error occurred while initializing the database");
+                _logger.LogError(ex, "Error initializing database");
+                throw;
+            }
+        }
+
+        public async Task SeedDatabaseAsync()
+        {
+            try
+            {
+                _logger.LogInformation("Seeding database with initial data");
+                
+                // Add seeding logic here if needed
+                
+                _logger.LogInformation("Database seeding completed successfully");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error seeding database");
                 throw;
             }
         }

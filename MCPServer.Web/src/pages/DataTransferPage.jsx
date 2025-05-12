@@ -1,3 +1,24 @@
+/*
+ * DataTransferConnections table fields:
+ * - ConnectionId (PK, int, not null)
+ * - ConnectionName (nvarchar(100), not null)
+ * - ConnectionString (nvarchar(1000), not null)
+ * - Description (nvarchar(500), null)
+ * - IsSource (bit, not null)
+ * - IsDestination (bit, not null)
+ * - IsActive (bit, not null)
+ * - CreatedBy (nvarchar(100), not null)
+ * - CreatedOn (datetime2(7), not null)
+ * - LastModifiedBy (nvarchar(100), null)
+ * - LastModifiedOn (datetime2(7), null)
+ * - ConnectionAccessLevel (nvarchar(20), not null)
+ * - LastTestedOn (datetime2(7), null)
+ * - MaxPoolSize (int, not null)
+ * - MinPoolSize (int, not null)
+ * - Timeout (int, not null)
+ * - Encrypt (bit, not null)
+ * - TrustServerCertificate (bit, not null)
+ */
 import React, { useState, useEffect } from 'react';
 import {
   Box,
@@ -230,7 +251,24 @@ export default function DataTransferPage() {
 
   const handleOpenConnectionDialog = (connection = null) => {
     if (connection) {
-      setNewConnection({ ...connection });
+      console.log('Opening connection for edit:', connection);
+      
+      // Use exact field names from the database schema
+      setNewConnection({
+        connectionId: connection.connectionId,
+        connectionName: connection.connectionName || '',
+        connectionString: connection.connectionString || '',
+        description: connection.description || '',
+        isSource: connection.isSource === true,
+        isDestination: connection.isDestination === true,
+        isActive: connection.isActive === true,
+        connectionAccessLevel: connection.connectionAccessLevel,
+        maxPoolSize: connection.maxPoolSize || 100,
+        minPoolSize: connection.minPoolSize || 5,
+        timeout: connection.timeout || 30,
+        encrypt: connection.encrypt === true,
+        trustServerCertificate: connection.trustServerCertificate === true
+      });
     } else {
       setNewConnection({
         connectionName: '',
@@ -239,6 +277,11 @@ export default function DataTransferPage() {
         isSource: true,
         isDestination: true,
         isActive: true,
+        maxPoolSize: 100,
+        minPoolSize: 5,
+        timeout: 30,
+        encrypt: true,
+        trustServerCertificate: true
       });
     }
     setIsConnectionDialogOpen(true);
@@ -246,10 +289,21 @@ export default function DataTransferPage() {
 
   const handleSaveConnection = async () => {
     try {
-      const response = await axios.post(`/api/data-transfer/connections`, newConnection);
+      console.log('Saving connection:', newConnection);
+      let response;
+      
+      if (newConnection.connectionId) {
+        // Update existing connection
+        response = await axios.put(`/api/data-transfer/connections/${newConnection.connectionId}`, newConnection);
+        showSnackbar(`Connection "${newConnection.connectionName}" updated successfully`, 'success');
+      } else {
+        // Create new connection
+        response = await axios.post(`/api/data-transfer/connections`, newConnection);
+        showSnackbar(`Connection "${newConnection.connectionName}" created successfully`, 'success');
+      }
+      
       setIsConnectionDialogOpen(false);
-      loadConnections();
-      showSnackbar('Connection saved successfully', 'success');
+      await loadConnections();
     } catch (error) {
       console.error('Error saving connection:', error);
       showSnackbar('Error saving connection', 'error');

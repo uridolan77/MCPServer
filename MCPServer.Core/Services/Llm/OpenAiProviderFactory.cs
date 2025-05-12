@@ -101,6 +101,7 @@ namespace MCPServer.Core.Services.Llm
             var httpClient = _httpClientFactory.CreateClient("OpenAI");
             var clientLogger = _loggerFactory.CreateLogger<OpenAiClient>();
 
+            // Use our adapter implementation that forwards to the new client
             return new OpenAiClient(
                 apiKey: apiKey,
                 endpoint: provider.ApiEndpoint,

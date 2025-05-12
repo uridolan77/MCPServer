@@ -74,9 +74,10 @@ namespace MCPServer.API.Middleware
                 Source = exception.Source,
                 RequestPath = context.Request.Path,
                 RequestMethod = context.Request.Method,
-                UserId = context.User.Identity?.IsAuthenticated == true
-                    ? Guid.Parse(context.User.FindFirst("UserId")?.Value ?? string.Empty)
-                    : null,
+                UserId = context.User.Identity?.IsAuthenticated == true && 
+                         !string.IsNullOrEmpty(context.User.FindFirst("UserId")?.Value) &&
+                         Guid.TryParse(context.User.FindFirst("UserId")?.Value, out Guid userId) 
+                         ? userId : null,
                 Timestamp = DateTime.UtcNow
             };
 

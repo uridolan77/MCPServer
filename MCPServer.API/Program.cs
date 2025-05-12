@@ -44,6 +44,9 @@ builder.Services.AddControllers()
 // Add memory cache
 builder.Services.AddMemoryCache();
 
+// Add HttpClient factory
+builder.Services.AddHttpClient();
+
 // Register caching service - already registered by AddMemoryCache()
 
 // Add response caching
@@ -229,8 +232,14 @@ builder.Services.AddAuthentication(options =>
 // Register LLM services
 builder.Services.AddLlmServices();
 
+// Register LLM provider service explicitly
+builder.Services.AddScoped<MCPServer.Core.Services.Interfaces.ILlmProviderService, MCPServer.Core.Services.LlmProviderService>();
+
 // Register LLM service explicitly
 builder.Services.AddScoped<MCPServer.Core.Services.Interfaces.ILlmService, MCPServer.Core.Services.LlmService>();
+
+// Register credential service explicitly
+builder.Services.AddScoped<MCPServer.Core.Services.Interfaces.ICredentialService, MCPServer.Core.Services.CredentialService>();
 
 // Register TokenManager service explicitly
 builder.Services.AddSingleton<MCPServer.Core.Services.Interfaces.ITokenManager, MCPServer.Core.Services.TokenManager>();
@@ -244,6 +253,18 @@ builder.Services.AddScoped<MCPServer.Core.Services.Interfaces.IChatUsageService,
 // Register provider services
 builder.Services.AddProviderServices();
 
+// Register RAG services 
+builder.Services.AddRagServices();
+
+// Register embedding service explicitly
+builder.Services.AddScoped<MCPServer.Core.Services.Interfaces.IEmbeddingService, MCPServer.Core.Services.Rag.DefaultEmbeddingService>();
+
+// Register document service explicitly
+builder.Services.AddScoped<MCPServer.Core.Services.Interfaces.IDocumentService, MCPServer.Core.Services.Rag.DocumentService>();
+
+// Register chat streaming service explicitly
+builder.Services.AddScoped<MCPServer.Core.Services.Interfaces.IChatStreamingService, MCPServer.Core.Services.ChatStreamingService>();
+
 // Configure Entity Framework
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
     ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
@@ -254,6 +275,40 @@ builder.Services.AddDbContext<McpServerDbContext>(options =>
 // Register DbContextFactory for background operations - making it scoped instead of singleton
 builder.Services.AddDbContextFactory<McpServerDbContext>(options =>
     options.UseMySQL(connectionString), ServiceLifetime.Scoped);
+
+// Get the raw ProgressPlayDB connection string with placeholders from appsettings.json
+var progressPlayConnectionString = builder.Configuration.GetConnectionString("ProgressPlayDB")
+    ?? throw new InvalidOperationException("Connection string 'ProgressPlayDB' not found.");
+
+// Register ConnectionStringResolverService and AzureKeyVaultService early so we can use them for DbContext configuration
+builder.Services.AddSingleton<IAzureKeyVaultService, AzureKeyVaultService>();
+builder.Services.AddSingleton<IConnectionStringResolverService, ConnectionStringResolverService>();
+
+// Register ProgressPlayDbContext using a factory method to allow connection string resolution at runtime
+builder.Services.AddDbContext<ProgressPlayDbContext>((serviceProvider, options) => 
+{
+    // Resolve the connection string using the ConnectionStringResolverService
+    var connectionStringResolver = serviceProvider.GetRequiredService<IConnectionStringResolverService>();
+    
+    // Resolve the connection string asynchronously (wait is needed for synchronous context)
+    var resolvedConnectionString = connectionStringResolver.ResolveConnectionStringAsync(progressPlayConnectionString).GetAwaiter().GetResult();
+    
+    // Use the resolved connection string with SQL Server
+    options.UseSqlServer(resolvedConnectionString);
+});
+
+// Register DbContextFactory for ProgressPlayDbContext
+builder.Services.AddDbContextFactory<ProgressPlayDbContext>((serviceProvider, options) =>
+{
+    // Resolve the connection string using the ConnectionStringResolverService
+    var connectionStringResolver = serviceProvider.GetRequiredService<IConnectionStringResolverService>();
+    
+    // Resolve the connection string asynchronously (wait is needed for synchronous context)
+    var resolvedConnectionString = connectionStringResolver.ResolveConnectionStringAsync(progressPlayConnectionString).GetAwaiter().GetResult();
+    
+    // Use the resolved connection string with SQL Server
+    options.UseSqlServer(resolvedConnectionString);
+}, ServiceLifetime.Scoped);
 
 // Register feature-based services
 builder.Services.AddAuthServices();
@@ -298,7 +353,7 @@ builder.Services.AddDataTransferApi();
 // Register the API-specific DataTransferService 
 builder.Services.AddSingleton<MCPServer.API.Features.DataTransfer.Services.DataTransferService>();
 builder.Services.AddSingleton<IAzureKeyVaultService, AzureKeyVaultService>();
-builder.Services.AddScoped<IConnectionStringResolverService, ConnectionStringResolverService>();
+builder.Services.AddSingleton<IConnectionStringResolverService, ConnectionStringResolverService>(); // Changed from AddScoped to AddSingleton
 
 var app = builder.Build();
 

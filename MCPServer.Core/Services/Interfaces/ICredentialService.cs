@@ -5,9 +5,7 @@ using MCPServer.Core.Models.Llm;
 
 namespace MCPServer.Core.Services.Interfaces
 {
-    /// <summary>
-    /// Interface for managing LLM provider credentials
-    /// </summary>
+    // Interface to maintain compatibility with existing code
     public interface ICredentialService
     {
         /// <summary>

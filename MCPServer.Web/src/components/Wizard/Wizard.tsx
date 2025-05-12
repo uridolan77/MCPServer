@@ -83,6 +83,12 @@ const Wizard: React.FC<WizardProps> = ({
   const [formData, setFormData] = useState(initialData);
   const [isNextDisabled, setIsNextDisabled] = useState(false);
 
+  // Update local formData when initialData changes from parent
+  useEffect(() => {
+    console.log('Wizard received updated initialData:', initialData);
+    setFormData(initialData);
+  }, [initialData]);
+
   // Check if current step has validation and update next button state
   useEffect(() => {
     const currentStep = steps[activeStep];
@@ -149,10 +155,20 @@ const Wizard: React.FC<WizardProps> = ({
   const currentStepContent = React.isValidElement(steps[activeStep]?.content)
     ? React.cloneElement(steps[activeStep].content as React.ReactElement, {
         formData,
-        updateFormData,
+        updateFormData, // Pass the form update function
         isLastStep: activeStep === steps.length - 1,
       })
     : steps[activeStep]?.content;
+
+  // Log the current form data when the active step changes
+  useEffect(() => {
+    console.log(`Wizard rendering step ${activeStep + 1} with form data:`, formData);
+    
+    // Make sure connection data is logged when transitioning to step 2
+    if (activeStep === 1) {
+      console.log('Passing connection data to step 2:', formData.selectedConnection);
+    }
+  }, [activeStep, formData]);
 
   return (
     <Paper elevation={3} sx={{ p: 3 }}>

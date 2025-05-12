@@ -1,6 +1,5 @@
 using System;
 using MCPServer.Core.Services.Interfaces;
-using MCPServer.Core.Services.Rag;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace MCPServer.Core.Features.Rag
@@ -22,11 +21,13 @@ namespace MCPServer.Core.Features.Rag
                 throw new ArgumentNullException(nameof(services));
             }
 
-            // Register RAG services
-            services.AddHttpClient<IEmbeddingService, MCPServer.Core.Services.Rag.EmbeddingService>();
-            services.AddScoped<IDocumentService, MCPServer.Core.Services.Rag.MySqlDocumentService>();
+            // Register VectorDb service that wasn't removed
             services.AddScoped<IVectorDbService, MCPServer.Core.Services.Rag.MySqlVectorDbService>();
-            services.AddScoped<IRagService, MCPServer.Core.Services.Rag.RagService>();
+            
+            // Note: The following services were removed in the cleanup:
+            // - EmbeddingService
+            // - MySqlDocumentService
+            // - RagService
 
             return services;
         }

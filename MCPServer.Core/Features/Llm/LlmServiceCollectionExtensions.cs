@@ -1,7 +1,4 @@
 using System;
-using MCPServer.Core.Services.Interfaces;
-using MCPServer.Core.Services;
-using MCPServer.Core.Services.Llm;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace MCPServer.Core.Features.Llm
@@ -23,15 +20,12 @@ namespace MCPServer.Core.Features.Llm
                 throw new ArgumentNullException(nameof(services));
             }
 
-            // Register HttpClient for LLM service
-            services.AddHttpClient<ILlmService, LlmService>();
-
-            // Register LLM services and factories
+            // Register HttpClients for LLM providers
             services.AddHttpClient("OpenAI");
             services.AddHttpClient("Anthropic");
-            services.AddScoped<ILlmProviderFactory, OpenAiProviderFactory>();
-            services.AddScoped<ILlmProviderFactory, AnthropicProviderFactory>();
-            services.AddScoped<ILlmService, LlmService>();
+            
+            // Note: LlmService has been migrated to a different implementation
+            // Register any new LLM services here
 
             return services;
         }

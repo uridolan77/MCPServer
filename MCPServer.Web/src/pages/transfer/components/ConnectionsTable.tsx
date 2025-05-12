@@ -14,33 +14,7 @@ import {
   Edit as EditIcon,
   PlayArrow as TestIcon
 } from '@mui/icons-material';
-
-interface Connection {
-  connectionId: number;
-  connectionName: string;
-  description?: string;
-  isSource?: boolean;
-  isDestination?: boolean;
-  isActive: boolean;
-  connectionAccessLevel?: 'ReadOnly' | 'WriteOnly' | 'ReadWrite';
-  lastTestedOn?: string | Date | null;
-  connectionString: string;
-  connectionStringForDisplay?: string;
-  // Add direct username and password properties
-  username?: string;
-  password?: string;
-  connectionDetails?: {
-    server?: string;
-    database?: string;
-    username?: string;
-    password?: string;
-    port?: string;
-  };
-  createdOn?: string | Date;
-  lastModifiedOn?: string | Date;
-  maxPoolSize?: number;
-  minPoolSize?: number;
-}
+import { Connection } from '../types/Connection';
 
 interface ConnectionsTableProps {
   connections: Connection[];
@@ -61,6 +35,16 @@ export default function ConnectionsTable({ connections, onEdit, onTest, isLoadin
     { field: 'connectionId', headerName: 'ID', width: 70 },
     { field: 'connectionName', headerName: 'Name', width: 200 },
     { field: 'description', headerName: 'Description', width: 250, flex: 1 },
+    {
+      field: 'server',
+      headerName: 'Server',
+      width: 180
+    },
+    {
+      field: 'database',
+      headerName: 'Database',
+      width: 150
+    },
     {
       field: 'connectionAccessLevel',
       headerName: 'Access Level',
@@ -102,6 +86,24 @@ export default function ConnectionsTable({ connections, onEdit, onTest, isLoadin
       },
     },
     {
+      field: 'timeout',
+      headerName: 'Timeout',
+      width: 100,
+      valueGetter: (params: GridValueGetterParams<any, Connection>) => {
+        return params.row.timeout || 30;
+      },
+    },
+    {
+      field: 'poolSize',
+      headerName: 'Pool Size',
+      width: 120,
+      valueGetter: (params: GridValueGetterParams<any, Connection>) => {
+        const min = params.row.minPoolSize || 0;
+        const max = params.row.maxPoolSize || 0;
+        return `${min}-${max}`;
+      },
+    },
+    {
       field: 'lastModifiedOn',
       headerName: 'Last Modified',
       width: 180,
@@ -110,16 +112,6 @@ export default function ConnectionsTable({ connections, onEdit, onTest, isLoadin
       },
       valueFormatter: (params: GridValueFormatterParams) => {
         return params.value ? params.value.toLocaleString() : '';
-      },
-    },
-    {
-      field: 'poolSize',
-      headerName: 'Pool Size',
-      width: 150,
-      valueGetter: (params: GridValueGetterParams<any, Connection>) => {
-        const min = params.row.minPoolSize || 0;
-        const max = params.row.maxPoolSize || 0;
-        return `${min}-${max}`;
       },
     },
     {
@@ -175,6 +167,40 @@ export default function ConnectionsTable({ connections, onEdit, onTest, isLoadin
     console.log('First row has connectionId:', 'connectionId' in safeRows[0]);
     console.log('Sample row:', safeRows[0]);
     console.log('Sample row keys:', Object.keys(safeRows[0]));
+    
+    // Debug field availability with case variations
+    const row = safeRows[0];
+    console.log('Server field check:', {
+      'server': row.server, 
+      'Server': (row as any).Server,
+      'has lowercase': 'server' in row,
+      'has uppercase': 'Server' in row
+    });
+    
+    console.log('Database field check:', {
+      'database': row.database, 
+      'Database': (row as any).Database,
+      'has lowercase': 'database' in row,
+      'has uppercase': 'Database' in row
+    });
+    
+    // Normalize case sensitivity issues in all rows
+    safeRows.forEach(row => {
+      if (!row.server && (row as any).Server) {
+        row.server = (row as any).Server;
+      }
+      if (!row.database && (row as any).Database) {
+        row.database = (row as any).Database;
+      }
+      // Also check other potential field case issues
+      if (!row.connectionName && (row as any).ConnectionName) {
+        row.connectionName = (row as any).ConnectionName;
+      }
+      if (!row.description && (row as any).Description) {
+        row.description = (row as any).Description;
+      }
+    });
+    
     console.log('Sample row connectionId type:', typeof safeRows[0].connectionId);
   } else {
     console.warn('No rows to display in ConnectionsTable');
@@ -192,8 +218,28 @@ export default function ConnectionsTable({ connections, onEdit, onTest, isLoadin
         }}
         pageSizeOptions={[10, 25, 50]}
         getRowId={(row) => {
-          console.log('getRowId called with row:', row);
-          return row.connectionId;
+          // Check for different ID fields in order of preference
+          if (row.connectionId !== undefined) {
+            return row.connectionId;
+          } else if (row.id !== undefined) {
+            return row.id;
+          } else if (row.$id !== undefined) {
+            return row.$id;
+          } else {
+            // Generate a fallback ID based on object properties
+            // This is a last resort to prevent errors
+            console.warn('Row missing ID field, generating fallback ID:', row);
+            const idString = JSON.stringify(row);
+            const fallbackId = `fallback-${Math.abs(
+              idString.split('').reduce((acc, char) => {
+                return (acc << 5) - acc + char.charCodeAt(0) | 0;
+              }, 0)
+            )}`;
+            
+            // Add the ID to the row object to make it consistent
+            (row as any).connectionId = fallbackId;
+            return fallbackId;
+          }
         }}
         loading={isLoading}
         disableRowSelectionOnClick

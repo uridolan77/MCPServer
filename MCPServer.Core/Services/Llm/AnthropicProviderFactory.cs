@@ -101,6 +101,7 @@ namespace MCPServer.Core.Services.Llm
             var httpClient = _httpClientFactory.CreateClient("Anthropic");
             var clientLogger = _loggerFactory.CreateLogger<AnthropicClient>();
 
+            // Return our own adapter implementation from the old namespace
             return new AnthropicClient(
                 apiKey: apiKey,
                 endpoint: provider.ApiEndpoint,

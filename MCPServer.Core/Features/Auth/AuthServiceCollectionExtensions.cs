@@ -25,7 +25,6 @@ namespace MCPServer.Core.Features.Auth
             // Register authentication services
             services.AddScoped<IUserService, UserService>();
             services.AddScoped<ITokenManager, TokenManager>();
-            services.AddScoped<ICredentialService, CredentialService>();
 
             return services;
         }
